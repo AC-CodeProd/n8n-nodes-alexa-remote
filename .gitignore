@@ -1,0 +1,28 @@
+# Ignore everything by default
+*
+
+# Root files
+!.gitignore
+!.npmignore
+!package.json
+!package-lock.json
+!pnpm-lock.yaml
+!tsconfig.json
+!eslint.config.mjs
+!.prettierrc.js
+!LICENSE
+!README.md
+!README.fr.md
+
+# GitHub Actions
+!.github/
+!.github/workflows/
+!.github/workflows/*.yml
+
+!credentials
+!credentials/**
+
+!nodes
+!nodes/*/
+!nodes/*/*/
+!nodes/**

@@ -1,0 +1,71 @@
+{
+  "name": "@ac-codeprod/n8n-nodes-alexa-remote",
+  "version": "0.1.0",
+  "description": "n8n node for interacting with Amazon Alexa API",
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "MIT",
+  "homepage": "https://github.com/ac-codeprod/n8n-nodes-alexa-remote",
+  "keywords": [
+    "n8n-community-node-package",
+    "n8n",
+    "alexa",
+    "amazon",
+    "echo",
+    "smart-home"
+  ],
+  "author": {
+    "name": "Alain CAJUSTE",
+    "email": "alain.cajuste@gmail.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ac-codeprod/n8n-nodes-alexa-remote.git"
+  },
+  "scripts": {
+    "build": "n8n-node build",
+    "build:watch": "tsc --watch",
+    "dev": "n8n-node dev",
+    "lint": "n8n-node lint",
+    "lint:fix": "n8n-node lint --fix",
+    "release": "n8n-node release",
+    "prepublishOnly": "n8n-node prerelease",
+    "upgrade-packages": "npx npm-check -u"
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "strict": false,
+    "credentials": [
+      "dist/credentials/AlexaRemoteApi.credentials.js"
+    ],
+    "nodes": [
+      "dist/nodes/AlexaRemote/AlexaRemote.node.js",
+      "dist/nodes/AlexaRemote/AlexaRemoteTrigger.node.js"
+    ]
+  },
+  "dependencies": {
+    "alexa-remote2": "^8.0.4",
+    "tough-cookie": "^6.0.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.29.0",
+    "@n8n/node-cli": "*",
+    "@types/tough-cookie": "^4.0.5",
+    "eslint": "^9.29.0",
+    "prettier": "^3.8.1",
+    "release-it": "^19.2.4",
+    "typescript": "^5.9.3"
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
