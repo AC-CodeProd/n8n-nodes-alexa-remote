@@ -1,5 +1,5 @@
 import AlexaRemote2 from 'alexa-remote2';
-import alexaCookie from 'alexa-cookie2';
+import AlexaCookie2 from 'alexa-cookie2';
 import { EventEmitter } from 'node:events';
 import { readCookieFile, writeCookieFile } from './cookie-crypto';
 import { buildSingleSequence, buildSpeakNode } from './helpers';
@@ -124,7 +124,7 @@ export class AlexaRemoteExt extends (EventEmitter as new () => EventEmitter) {
     return new Promise((resolve, reject) => {
       timerHandle = setTimeout(() => {
         JSON.parse = _origParse;
-        try { alexaCookie.stopProxyServer(); } catch { /* noop */ }
+        try { AlexaCookie2.stopProxyServer(); } catch { /* noop */ }
         reject(new Error(`Authentication timeout after ${loginTimeoutMs / 60000} minutes.`));
       }, loginTimeoutMs);
 
@@ -148,7 +148,7 @@ export class AlexaRemoteExt extends (EventEmitter as new () => EventEmitter) {
         return _origParse.call(this, text);
       };
 
-      alexaCookie.generateAlexaCookie(
+      AlexaCookie2.generateAlexaCookie(
         undefined,
         undefined,
         config,
@@ -161,7 +161,7 @@ export class AlexaRemoteExt extends (EventEmitter as new () => EventEmitter) {
               return;
             }
             clearTimeout(timerHandle);
-            try { alexaCookie.stopProxyServer(); } catch { /* noop */ }
+            try { AlexaCookie2.stopProxyServer(); } catch { /* noop */ }
             JSON.parse = _origParse;
             reject(err);
             return;
@@ -171,7 +171,7 @@ export class AlexaRemoteExt extends (EventEmitter as new () => EventEmitter) {
           const hasCookie = r.cookie || r.loginCookie;
           if (hasCookie) {
             clearTimeout(timerHandle);
-            try { alexaCookie.stopProxyServer(); } catch { /* noop */ }
+            try { AlexaCookie2.stopProxyServer(); } catch { /* noop */ }
             JSON.parse = _origParse;
             resolve(r);
           }
