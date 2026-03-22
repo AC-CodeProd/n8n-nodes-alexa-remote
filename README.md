@@ -1,5 +1,10 @@
 # @ac-codeprod/n8n-nodes-alexa-remote
 
+[![n8n community node](https://img.shields.io/badge/n8n-community%20node-orange?logo=n8n)](https://docs.n8n.io/integrations/community-nodes/installation/)
+[![npm version](https://img.shields.io/npm/v/@ac-codeprod/n8n-nodes-alexa-remote)](https://www.npmjs.com/package/@ac-codeprod/n8n-nodes-alexa-remote)
+[![npm downloads](https://img.shields.io/npm/dm/@ac-codeprod/n8n-nodes-alexa-remote)](https://www.npmjs.com/package/@ac-codeprod/n8n-nodes-alexa-remote)
+[![MIT License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 This is an n8n community node package that lets you interact with the Amazon Alexa API in your n8n workflows. It provides two nodes:
 
 - **Alexa Remote** — action node to control devices, execute routines, manage lists, notifications, and more.
