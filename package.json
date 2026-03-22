@@ -1,6 +1,6 @@
 {
   "name": "@ac-codeprod/n8n-nodes-alexa-remote",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "n8n node for interacting with Amazon Alexa API",
   "publishConfig": {
     "access": "public"

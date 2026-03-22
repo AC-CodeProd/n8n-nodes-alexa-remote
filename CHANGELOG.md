@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/AC-CodeProd/n8n-nodes-alexa-remote/compare/v0.2.1...v0.2.2) (2026-03-22)
+
+
+### Bug Fixes
+
+* **ci:** add id-token permission and force Node 24 for actions ([2f345ed](https://github.com/AC-CodeProd/n8n-nodes-alexa-remote/commit/2f345edac57d6ce34704402a6549afba22b7c421))
+
 ## [0.2.1](https://github.com/AC-CodeProd/n8n-nodes-alexa-remote/compare/v0.2.0...v0.2.1) (2026-03-22)
 
 
