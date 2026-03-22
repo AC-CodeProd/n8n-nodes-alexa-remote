@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.5](https://github.com/AC-CodeProd/n8n-nodes-alexa-remote/compare/v0.2.4...v0.2.5) (2026-03-22)
+
+
+### Bug Fixes
+
+* force release ([1818d8c](https://github.com/AC-CodeProd/n8n-nodes-alexa-remote/commit/1818d8c811cc1ec5afa241e5719b814924a5ebfc))
+
 ## [0.2.4](https://github.com/AC-CodeProd/n8n-nodes-alexa-remote/compare/v0.2.3...v0.2.4) (2026-03-22)
 
 
