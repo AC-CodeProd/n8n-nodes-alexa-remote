@@ -16,7 +16,7 @@
 !VERSION
 !CHANGELOG.md
 !.release-please-manifest.json
-!release-please-config.json
+!.release-please-config.json
 
 # GitHub Actions
 !.github/
