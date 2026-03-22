@@ -45,7 +45,7 @@ interface AlexaInternal {
 	deleteNotification(notification: Record<string, unknown>, callback: AlexaCb): void;
 	getListsV2(callback: AlexaCb): void;
 	addListItem(listType: string, text: string, callback: AlexaCb): void;
-	getListItems(listId: string, options: object, callback: AlexaCb): void;
+	getListItemsV2(listId: string, options: object, callback: AlexaCb): void;
 	deleteListItem(listId: string, itemId: string, options: object, callback: AlexaCb): void;
 	getAccount(callback: AlexaCb): void;
 	getContacts(callback: AlexaCb): void;
@@ -541,7 +541,7 @@ export class AlexaRemoteExt extends (EventEmitter as new () => EventEmitter) {
 	async getListItems(listId: string): Promise<AlexaListItem[]> {
 		this.assertInit();
 		return new Promise((resolve, reject) => {
-			this.alexa.getListItems(listId, {}, (error: Error | null, result) => {
+			this.alexa.getListItemsV2(listId, {}, (error: Error | null, result) => {
 				if (error) reject(error);
 				else resolve(result as unknown as AlexaListItem[]);
 			});
@@ -706,7 +706,7 @@ export class AlexaRemoteExt extends (EventEmitter as new () => EventEmitter) {
 
 export async function createAlexaFromCredentials(
 	credentials: Record<string, unknown>,
-	useWsMqtt = false,
+  usePushConnection = false,
 ): Promise<AlexaRemoteExt> {
 	const alexa = new AlexaRemoteExt();
 	const refreshIntervalDays = typeof credentials.refreshInterval === 'number' ? credentials.refreshInterval : 3;
@@ -716,7 +716,7 @@ export async function createAlexaFromCredentials(
 		alexaServiceHost: credentials.alexaServiceHost as string,
 		amazonPage: credentials.amazonPage as string,
 		acceptLanguage: credentials.acceptLanguage as string,
-		useWsMqtt,
+		usePushConnection,
 
 		cookieRefreshInterval: cookieRefreshIntervalMs,
 	};

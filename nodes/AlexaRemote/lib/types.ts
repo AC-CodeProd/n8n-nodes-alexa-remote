@@ -142,7 +142,7 @@ export interface AlexaInitOptions {
 	alexaServiceHost: string;
 	amazonPage: string;
 	acceptLanguage: string;
-	useWsMqtt?: boolean;
+  usePushConnection?: boolean;
 	cookieRefreshInterval?: number;
 
 	proxyOwnIp?: string;
