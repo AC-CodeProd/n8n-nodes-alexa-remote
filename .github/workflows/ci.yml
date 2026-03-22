@@ -24,10 +24,10 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Use Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '24'
 
@@ -61,39 +61,15 @@ jobs:
     if: needs.release-please.outputs.release_created == 'true'
     runs-on: ubuntu-latest
     steps:
-      - name: Check NPM_TOKEN
-        id: check-token
-        run: |
-          if [ -n "${{ secrets.NPM_TOKEN }}" ]; then
-            echo "has-token=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::warning::NPM_TOKEN secret is not set, skipping publish."
-            echo "has-token=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - uses: actions/checkout@v4
-        if: steps.check-token.outputs.has-token == 'true'
-
+      - uses: actions/checkout@v5
       - name: Use Node.js
-        if: steps.check-token.outputs.has-token == 'true'
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
-
       - name: Install dependencies
-        if: steps.check-token.outputs.has-token == 'true'
         run: npm ci
-
       - name: Build
-        if: steps.check-token.outputs.has-token == 'true'
         run: npm run build
-
       - name: Publish to npm
-        if: steps.check-token.outputs.has-token == 'true'
-        
-        run: |
-          [ -n "$NPM_TOKEN" ] && npm config set //registry.npmjs.org/:_authToken "$NPM_TOKEN"
-          npm run release
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm run release
