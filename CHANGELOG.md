@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.6] (2026-03-22)
+
+
+### Bug Fixes
+
+* add `alexa-cookie2` as direct dependency to fix module resolution with pnpm (n8n)
+
 ## [0.2.5](https://github.com/AC-CodeProd/n8n-nodes-alexa-remote/compare/v0.2.4...v0.2.5) (2026-03-22)
 
 
