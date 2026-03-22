@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.6](https://github.com/AC-CodeProd/n8n-nodes-alexa-remote/compare/v0.2.5...v0.2.6) (2026-03-22)
+
+
+### Bug Fixes
+
+* add alexa-cookie2 as direct dependency ([1061847](https://github.com/AC-CodeProd/n8n-nodes-alexa-remote/commit/10618473592614e905590685891273a6f65127f1))
+
 ## [0.2.6] (2026-03-22)
 
 
