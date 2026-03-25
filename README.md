@@ -263,6 +263,7 @@ The cookie will be automatically refreshed according to the **Refresh Interval**
 - **"no csrf" error**: Session expired, re-run `Auth → Authenticate`
 - **"401 Unauthorized"**: Invalid or expired cookie
 - **Proxy doesn't start**: Check that the configured port is not already in use
+- **Redirected to `http://[Proxy IP]:[Proxy Port]/alexa.amazon.com/about`**: If your browser lands on this URL instead of the login page, simply remove the `/alexa.amazon.com/about` path from the URL. Navigate directly to `http://[Proxy IP]:[Proxy Port]` to reach the login interface.
 
 ### Device Not Found
 
