@@ -4,7 +4,6 @@ import { NodeOperationError } from 'n8n-workflow';
 import type { AlexaRemoteExt } from '../../lib/alexa-remote-ext';
 import {
   buildBuiltinNode,
-  buildParallelSequence,
   buildSerialSequence,
   buildSingleSequence,
   buildSoundNode,
@@ -295,6 +294,67 @@ export const description: INodeProperties[] = [
   },
 ];
 
+async function resolveGroupsToDevices(
+  alexa: AlexaRemoteExt,
+  ids: string[],
+  node: ReturnType<IExecuteFunctions['getNode']>,
+): Promise<string[]> {
+  const groups = await alexa.getMultiRoomGroups().catch((err: unknown) => {
+    throw new NodeOperationError(node, `Failed to fetch Alexa groups: ${String(err)}`, {
+      description: 'Check your Alexa credentials and network connection.',
+    });
+  });
+
+  const groupMap = new Map(
+    groups.map((g) => {
+      const members = (g.members ?? []) as Array<Record<string, unknown>>;
+      const memberSerials = members
+        .map((m) => {
+          for (const field of ['serialNumber', 'dsn', 'applianceId']) {
+            const val = m[field];
+            if (typeof val === 'string' && val && alexa.lookupDevice(val) !== null) {
+              return val;
+            }
+          }
+          for (const field of ['serialNumber', 'dsn', 'applianceId']) {
+            const val = m[field];
+            if (typeof val === 'string' && val) return val;
+          }
+          return undefined;
+        })
+        .filter((id): id is string => !!id);
+      return [g.id, memberSerials] as [string, string[]];
+    }),
+  );
+
+  const resolved = [
+    ...new Set(
+      ids.flatMap((id) => {
+        const members = groupMap.get(id);
+        if (members && members.length > 0) return members;
+        const matchedGroup = groups.find((g) => g.id === id);
+        if (matchedGroup) {
+          const rawMembers = matchedGroup.members ?? [];
+          throw new NodeOperationError(
+            node,
+            `Group "${matchedGroup.name}" resolved to 0 devices.`,
+            {
+              description: `Raw member data: ${JSON.stringify(rawMembers, null, 2)}\n\nExpected fields: serialNumber, dsn, or applianceId. Please report this so the integration can be fixed.`,
+            },
+          );
+        }
+        return [id];
+      }),
+    ),
+  ];
+
+  return resolved;
+}
+
+async function resolveGroupToDevices(alexa: AlexaRemoteExt, id: string, node: ReturnType<IExecuteFunctions['getNode']>): Promise<string[]> {
+  return resolveGroupsToDevices(alexa, [id], node);
+}
+
 export async function execute(
   this: IExecuteFunctions,
   alexa: AlexaRemoteExt,
@@ -319,33 +379,51 @@ export async function execute(
         ? (this.getNodeParameter('ssmlContent', itemIndex) as string)
         : (this.getNodeParameter('text', itemIndex) as string);
 
+    const devices = await resolveGroupToDevices(alexa, device, this.getNode());
+
     if (speakType === 'announcement') {
-      return alexa.sendAnnouncement([device], text, locale);
+      return alexa.sendAnnouncement(devices, text, locale);
     }
-    return alexa.sendSequenceCommand(
-      buildSingleSequence(buildSpeakNode(device, text, locale)),
+    if (devices.length === 1) {
+      return alexa.sendSequenceCommand(
+        buildSingleSequence(buildSpeakNode(devices[0], text, locale)),
+      );
+    }
+    return Promise.all(
+      devices.map((d) => alexa.sendSequenceCommand(buildSingleSequence(buildSpeakNode(d, text, locale)))),
     );
   }
 
   if (operation === 'speakAll') {
-    const devices = this.getNodeParameter('devices', itemIndex) as string[];
+    const rawDevices = this.getNodeParameter('devices', itemIndex) as string[];
     const speakType = this.getNodeParameter('speakType', itemIndex) as string;
     const text =
       speakType === 'ssml'
         ? (this.getNodeParameter('ssmlContent', itemIndex) as string)
         : (this.getNodeParameter('text', itemIndex) as string);
 
+    const devices = await resolveGroupsToDevices(alexa, rawDevices, this.getNode());
+
     if (speakType === 'announcement') {
       return alexa.sendAnnouncement(devices, text, locale);
     }
-    return alexa.sendSequenceCommand(
-      buildParallelSequence(devices.map((device) => buildSpeakNode(device, text, locale))),
+    if (devices.length === 1) {
+      return alexa.sendSequenceCommand(
+        buildSingleSequence(buildSpeakNode(devices[0], text, locale)),
+      );
+    }
+    return Promise.all(
+      devices.map((d) => alexa.sendSequenceCommand(buildSingleSequence(buildSpeakNode(d, text, locale)))),
     );
   }
 
   if (operation === 'stop') {
     const device = this.getNodeParameter('device', itemIndex) as string;
-    return alexa.sendSequenceCommandStr(device, 'deviceStop', null);
+    const devices = await resolveGroupToDevices(alexa, device, this.getNode());
+    if (devices.length === 1) {
+      return alexa.sendSequenceCommandStr(devices[0], 'deviceStop', null);
+    }
+    return Promise.all(devices.map((d) => alexa.sendSequenceCommandStr(d, 'deviceStop', null)));
   }
 
   if (operation === 'music') {
@@ -364,18 +442,29 @@ export async function execute(
         : (this.getNodeParameter('text', itemIndex) as string);
     const volumeValue = this.getNodeParameter('volumeValue', itemIndex) as number;
 
+    const devices = await resolveGroupToDevices(alexa, device, this.getNode());
+
     if (speakType === 'announcement') {
-      await alexa.sendSequenceCommand(
-        buildSingleSequence(buildVolumeNode(device, volumeValue, locale)),
+      await Promise.all(
+        devices.map((d) => alexa.sendSequenceCommand(buildSingleSequence(buildVolumeNode(d, volumeValue, locale)))),
       );
-      return alexa.sendAnnouncement([device], text, locale);
+      return alexa.sendAnnouncement(devices, text, locale);
     }
-    return alexa.sendSequenceCommand(
-      buildSerialSequence([
-        buildVolumeNode(device, volumeValue, locale),
-        buildWaitNode(1),
-        buildSpeakNode(device, text, locale),
-      ]),
+    if (devices.length === 1) {
+      return alexa.sendSequenceCommand(
+        buildSerialSequence([
+          buildVolumeNode(devices[0], volumeValue, locale),
+          buildWaitNode(1),
+          buildSpeakNode(devices[0], text, locale),
+        ]),
+      );
+    }
+    return Promise.all(
+      devices.map((d) =>
+        alexa.sendSequenceCommand(
+          buildSerialSequence([buildVolumeNode(d, volumeValue, locale), buildWaitNode(1), buildSpeakNode(d, text, locale)]),
+        ),
+      ),
     );
   }
 
@@ -388,22 +477,38 @@ export async function execute(
   if (operation === 'volume') {
     const device = this.getNodeParameter('device', itemIndex) as string;
     const volumeValue = this.getNodeParameter('volumeValue', itemIndex) as number;
-    return alexa.setVolume(device, volumeValue);
+    const devices = await resolveGroupToDevices(alexa, device, this.getNode());
+    if (devices.length === 1) {
+      return alexa.setVolume(devices[0], volumeValue);
+    }
+    return Promise.all(devices.map((d) => alexa.setVolume(d, volumeValue)));
   }
 
   if (operation === 'builtin') {
     const device = this.getNodeParameter('device', itemIndex) as string;
     const builtinType = this.getNodeParameter('builtinType', itemIndex) as BuiltinType;
-    return alexa.sendSequenceCommand(
-      buildSingleSequence(buildBuiltinNode(device, builtinType, locale)),
+    const devices = await resolveGroupToDevices(alexa, device, this.getNode());
+    if (devices.length === 1) {
+      return alexa.sendSequenceCommand(
+        buildSingleSequence(buildBuiltinNode(devices[0], builtinType, locale)),
+      );
+    }
+    return Promise.all(
+      devices.map((d) => alexa.sendSequenceCommand(buildSingleSequence(buildBuiltinNode(d, builtinType, locale)))),
     );
   }
 
   if (operation === 'sound') {
     const device = this.getNodeParameter('device', itemIndex) as string;
     const soundId = this.getNodeParameter('soundId', itemIndex) as string;
-    return alexa.sendSequenceCommand(
-      buildSingleSequence(buildSoundNode(device, soundId, locale)),
+    const devices = await resolveGroupToDevices(alexa, device, this.getNode());
+    if (devices.length === 1) {
+      return alexa.sendSequenceCommand(
+        buildSingleSequence(buildSoundNode(devices[0], soundId, locale)),
+      );
+    }
+    return Promise.all(
+      devices.map((d) => alexa.sendSequenceCommand(buildSingleSequence(buildSoundNode(d, soundId, locale)))),
     );
   }
 

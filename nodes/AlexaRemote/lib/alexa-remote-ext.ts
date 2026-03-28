@@ -688,6 +688,10 @@ export class AlexaRemoteExt extends (EventEmitter as new () => EventEmitter) {
 		});
 	}
 
+	lookupDevice(serialOrName: string): AlexaDevice | null {
+		return (this.alexa.find(serialOrName) as AlexaDevice | null | undefined) ?? null;
+	}
+
 	onPushEvent(eventType: AlexaPushEventType, handler: (payload: AlexaPushEvent) => void): this {
 		return this.on(eventType, handler);
 	}

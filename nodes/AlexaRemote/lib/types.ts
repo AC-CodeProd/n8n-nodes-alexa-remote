@@ -218,5 +218,5 @@ export interface AlexaBuiltinPayload {
 export interface AlexaMultiRoomGroup {
 	id: string;
 	name: string;
-	members?: Array<{ applianceId?: string; name?: string }>;
+	members?: Array<{ serialNumber?: string; dsn?: string; applianceId?: string; name?: string }>;
 }

@@ -118,14 +118,17 @@ export function buildSerialSequence(
 	};
 }
 
-export function buildParallelSequence(nodes: AlexaOperationNode[]): AlexaSequenceNode {
-	const parallel: AlexaParallelNode = {
+export function buildParallelNode(nodes: AlexaOperationNode[]): AlexaParallelNode {
+	return {
 		'@type': 'com.amazon.alexa.behaviors.model.ParallelNode',
 		nodesToExecute: nodes,
 	};
+}
+
+export function buildParallelSequence(nodes: AlexaOperationNode[]): AlexaSequenceNode {
 	return {
 		'@type': 'com.amazon.alexa.behaviors.model.Sequence',
-		startNode: parallel,
+		startNode: buildParallelNode(nodes),
 	};
 }
 
