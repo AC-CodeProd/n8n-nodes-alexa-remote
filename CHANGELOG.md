@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0](https://github.com/AC-CodeProd/n8n-nodes-alexa-remote/compare/v0.2.6...v0.3.0) (2026-03-28)
+
+
+### Features
+
+* fix/interaction-improvements → main ([3fbcf74](https://github.com/AC-CodeProd/n8n-nodes-alexa-remote/commit/3fbcf742197c4de81a5a626d48f6ffe3cd10585d))
+
+
+### Bug Fixes
+
+* correct volume payload and restore volume after TTS ([8391831](https://github.com/AC-CodeProd/n8n-nodes-alexa-remote/commit/8391831926367cda678d9483913b9ea554e6ecf6))
+* resolve Alexa groups to member devices before commands ([8a23142](https://github.com/AC-CodeProd/n8n-nodes-alexa-remote/commit/8a2314299e1876206d33787d43aa2c1711356fa1))
+
 ## [0.2.6](https://github.com/AC-CodeProd/n8n-nodes-alexa-remote/compare/v0.2.5...v0.2.6) (2026-03-22)
 
 
