@@ -37,11 +37,12 @@ export function buildVolumeNode(device: string, volume: number, locale: string):
 		deviceSerialNumber: device,
 		locale,
 		customerId: 'ALEXA_CUSTOMER_ID',
-		volumeSetting: volume,
+		value: volume,
 	};
 	return {
 		'@type': 'com.amazon.alexa.behaviors.model.OpaquePayloadOperationNode',
 		type: 'Alexa.DeviceControls.Volume',
+		skillId: 'amzn1.ask.1p.alexadevicecontrols',
 		operationPayload: payload,
 	};
 }

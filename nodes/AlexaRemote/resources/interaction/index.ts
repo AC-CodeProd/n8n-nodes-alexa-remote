@@ -444,28 +444,42 @@ export async function execute(
 
     const devices = await resolveGroupToDevices(alexa, device, this.getNode());
 
-    if (speakType === 'announcement') {
-      await Promise.all(
-        devices.map((d) => alexa.sendSequenceCommand(buildSingleSequence(buildVolumeNode(d, volumeValue, locale)))),
-      );
-      return alexa.sendAnnouncement(devices, text, locale);
-    }
-    if (devices.length === 1) {
-      return alexa.sendSequenceCommand(
-        buildSerialSequence([
-          buildVolumeNode(devices[0], volumeValue, locale),
-          buildWaitNode(1),
-          buildSpeakNode(devices[0], text, locale),
-        ]),
-      );
-    }
-    return Promise.all(
-      devices.map((d) =>
-        alexa.sendSequenceCommand(
-          buildSerialSequence([buildVolumeNode(d, volumeValue, locale), buildWaitNode(1), buildSpeakNode(d, text, locale)]),
-        ),
-      ),
+    const originalVolumes = await Promise.all(
+      devices.map(async (d) => {
+        const vol = await alexa.getDeviceVolume(d).catch(() => null);
+        return { device: d, volume: vol };
+      }),
     );
+
+    if (speakType === 'announcement') {
+      const restoreVolumes = async () => {
+        await Promise.all(
+          originalVolumes
+            .filter((v) => v.volume !== null)
+            .map((v) => alexa.setVolume(v.device, v.volume as number, locale)),
+        );
+      };
+      await Promise.all(devices.map((d) => alexa.setVolume(d, volumeValue, locale)));
+      await alexa.sendAnnouncement(devices, text, locale);
+      const estimatedMs = Math.max(1500, text.length * 70 + 1000);
+      setTimeout(() => { void restoreVolumes(); }, estimatedMs);
+      return { success: true };
+    }
+
+    await Promise.all(
+      devices.map((d) => {
+        const origVol = originalVolumes.find((v) => v.device === d)?.volume ?? null;
+        const nodes = [
+          buildVolumeNode(d, volumeValue, locale),
+          buildSpeakNode(d, text, locale),
+        ];
+        if (origVol !== null) {
+          nodes.push(buildVolumeNode(d, origVol, locale));
+        }
+        return alexa.sendSequenceCommand(buildSerialSequence(nodes));
+      }),
+    );
+    return { success: true };
   }
 
   if (operation === 'textCommand') {
@@ -479,9 +493,9 @@ export async function execute(
     const volumeValue = this.getNodeParameter('volumeValue', itemIndex) as number;
     const devices = await resolveGroupToDevices(alexa, device, this.getNode());
     if (devices.length === 1) {
-      return alexa.setVolume(devices[0], volumeValue);
+      return alexa.setVolume(devices[0], volumeValue, locale);
     }
-    return Promise.all(devices.map((d) => alexa.setVolume(d, volumeValue)));
+    return Promise.all(devices.map((d) => alexa.setVolume(d, volumeValue, locale)));
   }
 
   if (operation === 'builtin') {
