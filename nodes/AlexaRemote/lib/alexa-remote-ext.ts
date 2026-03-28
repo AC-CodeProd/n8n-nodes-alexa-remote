@@ -2,7 +2,7 @@ import AlexaRemote2 from 'alexa-remote2';
 import AlexaCookie2 from 'alexa-cookie2';
 import { EventEmitter } from 'node:events';
 import { readCookieFile, writeCookieFile } from './cookie-crypto';
-import { buildSingleSequence, buildSpeakNode } from './helpers';
+import { buildSingleSequence, buildSpeakNode, buildVolumeNode } from './helpers';
 import type {
 	AlexaBluetoothState,
 	AlexaConversation,
@@ -54,6 +54,7 @@ interface AlexaInternal {
 	connectBluetooth(device: string, mac: string, callback: AlexaCb): void;
 	disconnectBluetooth(device: string, empty: string, callback: AlexaCb): void;
 	unpaireBluetooth(device: string, mac: string, callback: AlexaCb): void;
+	getAllDeviceVolumes(callback: AlexaCb): void;
 	getPlayerInfo(device: string, callback: AlexaCb): void;
 	getPlayerQueue(device: string, size: number, callback: AlexaCb): void;
 	getConversations(options: object, callback: AlexaCb): void;
@@ -340,11 +341,9 @@ export class AlexaRemoteExt extends (EventEmitter as new () => EventEmitter) {
 		return this.sendSequenceCommand(sequence);
 	}
 
-	async setVolume(device: string, volume: number): Promise<unknown> {
+	async setVolume(device: string, volume: number, locale = 'en-US'): Promise<unknown> {
 		this.assertInit();
-
-		await this.sendCommand(device, 'volume', String(volume));
-		return { success: true, device, volume };
+		return this.sendSequenceCommand(buildSingleSequence(buildVolumeNode(device, volume, locale)));
 	}
 
 	async playMusic(
@@ -629,6 +628,18 @@ export class AlexaRemoteExt extends (EventEmitter as new () => EventEmitter) {
 		});
 	}
 
+	async getDeviceVolume(serial: string): Promise<number | null> {
+		this.assertInit();
+		return new Promise((resolve) => {
+			this.alexa.getAllDeviceVolumes((error: Error | null, result) => {
+				if (error || !result) return resolve(null);
+				const data = result as { volumes?: Array<{ dsn?: string; speakerVolume?: number }> };
+				const entry = data.volumes?.find((v) => v.dsn === serial);
+				resolve(entry?.speakerVolume ?? null);
+			});
+		});
+	}
+
 	async getPlayerInfo(device: string): Promise<AlexaPlayerInfo> {
 		this.assertInit();
 		return new Promise((resolve, reject) => {
@@ -686,6 +697,10 @@ export class AlexaRemoteExt extends (EventEmitter as new () => EventEmitter) {
 				else resolve((result ?? []) as unknown as AlexaMultiRoomGroup[]);
 			});
 		});
+	}
+
+	lookupDevice(serialOrName: string): AlexaDevice | null {
+		return (this.alexa.find(serialOrName) as AlexaDevice | null | undefined) ?? null;
 	}
 
 	onPushEvent(eventType: AlexaPushEventType, handler: (payload: AlexaPushEvent) => void): this {

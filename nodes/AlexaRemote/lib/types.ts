@@ -96,7 +96,7 @@ export interface AlexaVolumePayload {
 	deviceSerialNumber: string;
 	locale: string;
 	customerId: string;
-	volumeSetting: number;
+	value: number;
 }
 
 export interface AlexaPromptPayload {
@@ -183,7 +183,7 @@ export interface AlexaBluetoothState {
 	pairedDeviceList?: AlexaBluetoothDevice[];
 }
 
-export interface AlexaPlayerInfo {
+export interface AlexaPlayerInfoData {
 	state?: string;
 	playerType?: string;
 	infoText?: { title?: string; subText1?: string; subText2?: string };
@@ -192,6 +192,10 @@ export interface AlexaPlayerInfo {
 	volume?: { volume?: number; muted?: boolean };
 	transport?: { shuffle?: boolean; repeat?: string };
 	provider?: { providerDisplayName?: string };
+}
+
+export interface AlexaPlayerInfo {
+	playerInfo?: AlexaPlayerInfoData;
 }
 
 export interface AlexaConversation {
@@ -218,5 +222,5 @@ export interface AlexaBuiltinPayload {
 export interface AlexaMultiRoomGroup {
 	id: string;
 	name: string;
-	members?: Array<{ applianceId?: string; name?: string }>;
+	members?: Array<{ serialNumber?: string; dsn?: string; applianceId?: string; name?: string }>;
 }
