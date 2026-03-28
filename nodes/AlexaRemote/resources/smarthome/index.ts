@@ -1,4 +1,5 @@
 import type { INodeProperties, IExecuteFunctions } from 'n8n-workflow';
+import { NodeOperationError } from 'n8n-workflow';
 
 import type { AlexaRemoteExt } from '../../lib/alexa-remote-ext';
 
@@ -73,6 +74,7 @@ export const description: INodeProperties[] = [
       show: {
         resource: ['smarthome'],
         operation: ['controlDevice'],
+        action: ['setBrightness', 'setColor', 'setTargetTemperature'],
       },
     },
     description: 'Action value (e.g. brightness level, color hex, temperature)',
@@ -92,7 +94,16 @@ export async function execute(
     const entity = this.getNodeParameter('entity', itemIndex) as string;
     const action = this.getNodeParameter('action', itemIndex) as string;
     const actionValue = this.getNodeParameter('actionValue', itemIndex, '') as string;
-    return alexa.controlSmarthomeDevice(entity, action, actionValue || undefined);
+    if (['setBrightness', 'setColor', 'setTargetTemperature'].includes(action) && !actionValue) {
+      throw new NodeOperationError(this.getNode(), `Action "${action}" requires a value.`, {
+        itemIndex,
+      });
+    }
+    return alexa.controlSmarthomeDevice(
+      entity,
+      action,
+      ['turnOn', 'turnOff'].includes(action) ? undefined : actionValue || undefined,
+    );
   }
   return undefined;
 }

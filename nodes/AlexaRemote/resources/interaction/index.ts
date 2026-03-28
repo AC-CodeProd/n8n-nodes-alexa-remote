@@ -430,7 +430,12 @@ export async function execute(
     const device = this.getNodeParameter('device', itemIndex) as string;
     const provider = this.getNodeParameter('musicProvider', itemIndex) as string;
     const search = this.getNodeParameter('searchQuery', itemIndex) as string;
-    return alexa.playMusic(device, provider, search);
+    const duration = this.getNodeParameter('duration', itemIndex, 0) as number;
+    const devices = await resolveGroupToDevices(alexa, device, this.getNode());
+    if (devices.length === 1) {
+      return alexa.playMusic(devices[0], provider, search, locale, duration);
+    }
+    return Promise.all(devices.map((d) => alexa.playMusic(d, provider, search, locale, duration)));
   }
 
   if (operation === 'speakAtVolume') {
@@ -485,7 +490,11 @@ export async function execute(
   if (operation === 'textCommand') {
     const device = this.getNodeParameter('device', itemIndex) as string;
     const text = this.getNodeParameter('text', itemIndex) as string;
-    return alexa.sendSequenceCommandStr(device, 'textCommand', text);
+    const devices = await resolveGroupToDevices(alexa, device, this.getNode());
+    if (devices.length === 1) {
+      return alexa.sendSequenceCommandStr(devices[0], 'textCommand', text);
+    }
+    return Promise.all(devices.map((d) => alexa.sendSequenceCommandStr(d, 'textCommand', text)));
   }
 
   if (operation === 'volume') {

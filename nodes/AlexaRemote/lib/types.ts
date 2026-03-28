@@ -168,6 +168,7 @@ export interface AlexaPushEvent {
 	command: string;
 	payload: Record<string, unknown>;
 	destinationUserId?: string;
+	eventType?: AlexaPushEventType;
 }
 
 export interface AlexaBluetoothDevice {
@@ -196,6 +197,12 @@ export interface AlexaPlayerInfoData {
 
 export interface AlexaPlayerInfo {
 	playerInfo?: AlexaPlayerInfoData;
+}
+
+export interface AlexaPlayerQueue {
+	queue?: Array<Record<string, unknown>>;
+	playingItem?: Record<string, unknown>;
+	[index: string]: unknown;
 }
 
 export interface AlexaConversation {

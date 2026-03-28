@@ -57,7 +57,7 @@ export const description: INodeProperties[] = [
     displayName: 'Device Name or ID',
     name: 'device',
     type: 'options',
-    typeOptions: { loadOptionsMethod: 'getEchoDevices' },
+    typeOptions: { loadOptionsMethod: 'getEchoDevicesOnly' },
     default: '',
     required: true,
     displayOptions: {

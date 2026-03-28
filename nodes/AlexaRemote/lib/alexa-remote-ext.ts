@@ -2,7 +2,7 @@ import AlexaRemote2 from 'alexa-remote2';
 import AlexaCookie2 from 'alexa-cookie2';
 import { EventEmitter } from 'node:events';
 import { readCookieFile, writeCookieFile } from './cookie-crypto';
-import { buildSingleSequence, buildSpeakNode, buildVolumeNode } from './helpers';
+import { buildMusicNode, buildSingleSequence, buildSpeakNode, buildVolumeNode } from './helpers';
 import type {
 	AlexaBluetoothState,
 	AlexaConversation,
@@ -13,6 +13,7 @@ import type {
 	AlexaMultiRoomGroup,
 	AlexaNotification,
 	AlexaPlayerInfo,
+	AlexaPlayerQueue,
 	AlexaPushEvent,
 	AlexaPushEventType,
 	AlexaRoutine,
@@ -113,73 +114,109 @@ export class AlexaRemoteExt extends (EventEmitter as new () => EventEmitter) {
 		});
 	}
 
-  startProxyAuth(
-    options: AlexaInitOptions,
-    loginTimeoutMs: number,
-    onProxyReady: (url: string) => void,
-  ): Promise<unknown> {
+	startProxyAuth(
+		options: AlexaInitOptions,
+		loginTimeoutMs: number,
+		onProxyReady: (url: string) => void,
+	): Promise<Record<string, unknown>> {
+		const _origParse = JSON.parse;
+		let timerHandle: ReturnType<typeof setTimeout> | undefined;
+		let proxyCallbackFired = false;
+		let settled = false;
 
-    let timerHandle: ReturnType<typeof setTimeout> | undefined;
-    let proxyCallbackFired = false;
+		const cleanup = () => {
+			if (timerHandle) {
+				clearTimeout(timerHandle);
+			}
+			JSON.parse = _origParse;
+			try {
+				AlexaCookie2.stopProxyServer();
+			} catch {
+				/* noop */
+			}
+		};
 
-    return new Promise((resolve, reject) => {
-      timerHandle = setTimeout(() => {
-        JSON.parse = _origParse;
-        try { AlexaCookie2.stopProxyServer(); } catch { /* noop */ }
-        reject(new Error(`Authentication timeout after ${loginTimeoutMs / 60000} minutes.`));
-      }, loginTimeoutMs);
+		const settle = (
+			type: 'resolve' | 'reject',
+			value: Record<string, unknown> | Error,
+			resolve: (result: Record<string, unknown>) => void,
+			reject: (error: Error) => void,
+		) => {
+			if (settled) return;
+			settled = true;
+			cleanup();
+			if (type === 'resolve') {
+				resolve(value as Record<string, unknown>);
+			} else {
+				reject(value as Error);
+			}
+		};
 
-      const config = {
-        proxyOnly: true,
-        setupProxy: true,
-        proxyOwnIp: options.proxyOwnIp,
-        proxyPort: options.proxyPort,
-        proxyListenBind: '0.0.0.0',
-        alexaServiceHost: 'layla.amazon.fr',
-        amazonPage: 'amazon.fr',
-        acceptLanguage: 'fr-FR',
-        proxyLogLevel: 'info',
-      };
+		return new Promise((resolve, reject) => {
+			timerHandle = setTimeout(() => {
+				settle(
+					'reject',
+					new Error(`Authentication timeout after ${loginTimeoutMs / 60000} minutes.`),
+					resolve,
+					reject,
+				);
+			}, loginTimeoutMs);
 
-      const _origParse = JSON.parse;
-      JSON.parse = function (text) {
-        if (text === '' || text == null || (typeof text === 'string' && text.trim() === '')) {
-          return {};
-        }
-        return _origParse.call(this, text);
-      };
+			const config = {
+				proxyOnly: true,
+				setupProxy: true,
+				proxyOwnIp: options.proxyOwnIp,
+				proxyPort: options.proxyPort,
+				proxyListenBind: '0.0.0.0',
+				alexaServiceHost: options.alexaServiceHost,
+				amazonPage: options.amazonPage,
+				acceptLanguage: options.acceptLanguage,
+				proxyLogLevel: 'info',
+			};
 
-      AlexaCookie2.generateAlexaCookie(
-        undefined,
-        undefined,
-        config,
-        (err: Error | null, result: unknown) => {
-          if (err) {
-            if (!proxyCallbackFired) {
-              proxyCallbackFired = true;
-              const match = /http:\/\/[^\s)]+/.exec(err.message);
-              onProxyReady(match ? match[0] : `http://${options.proxyOwnIp}:${options.proxyPort}/`);
-              return;
-            }
-            clearTimeout(timerHandle);
-            try { AlexaCookie2.stopProxyServer(); } catch { /* noop */ }
-            JSON.parse = _origParse;
-            reject(err);
-            return;
-          }
+			JSON.parse = function (text) {
+				if (text === '' || text == null || (typeof text === 'string' && text.trim() === '')) {
+					return {};
+				}
+				return _origParse.call(this, text);
+			};
 
-          const r = result as Record<string, unknown>;
-          const hasCookie = r.cookie || r.loginCookie;
-          if (hasCookie) {
-            clearTimeout(timerHandle);
-            try { AlexaCookie2.stopProxyServer(); } catch { /* noop */ }
-            JSON.parse = _origParse;
-            resolve(r);
-          }
-        },
-      );
-    });
-  }
+			try {
+				AlexaCookie2.generateAlexaCookie(
+					undefined,
+					undefined,
+					config,
+					(err: Error | null, result: unknown) => {
+						if (settled) return;
+
+						if (err) {
+							if (!proxyCallbackFired) {
+								proxyCallbackFired = true;
+								const match = /http:\/\/[^\s)]+/.exec(err.message);
+								onProxyReady(match ? match[0] : `http://${options.proxyOwnIp}:${options.proxyPort}/`);
+								return;
+							}
+
+							settle('reject', err, resolve, reject);
+							return;
+						}
+
+						const payload = (result ?? {}) as Record<string, unknown>;
+						if (payload.cookie || payload.loginCookie) {
+							settle('resolve', payload, resolve, reject);
+						}
+					},
+				);
+			} catch (error) {
+				settle(
+					'reject',
+					error instanceof Error ? error : new Error(String(error)),
+					resolve,
+					reject,
+				);
+			}
+		});
+	}
 
 	private assertInit(): void {
 		if (!this.initialized) {
@@ -198,8 +235,19 @@ export class AlexaRemoteExt extends (EventEmitter as new () => EventEmitter) {
 	}
 
 	async getDeviceInfo(serialNumber: string): Promise<AlexaDevice | undefined> {
+		this.assertInit();
+		const exactMatch = this.lookupDevice(serialNumber);
+		if (exactMatch) {
+			return exactMatch;
+		}
+
 		const devices = await this.getDevices();
-		return devices.find((d) => d.serialNumber === serialNumber);
+		const normalized = serialNumber.trim().toLowerCase();
+		return devices.find(
+			(d) =>
+				d.serialNumber === serialNumber ||
+				d.accountName?.trim().toLowerCase() === normalized,
+		);
 	}
 
 	async sendCommand(device: string, command: string, value: string | null = null): Promise<unknown> {
@@ -350,8 +398,16 @@ export class AlexaRemoteExt extends (EventEmitter as new () => EventEmitter) {
 		device: string,
 		provider: string,
 		search: string,
+		locale = 'en-US',
+		duration = 0,
 	): Promise<unknown> {
 		this.assertInit();
+
+		if (duration > 0) {
+			return this.sendSequenceCommand(
+				buildSingleSequence(buildMusicNode(device, provider, search, locale, duration)),
+			);
+		}
 
 		return new Promise((resolve, reject) => {
 			this.alexa.playMusicProvider(device, provider, search, (error: Error | null, result) => {
@@ -363,6 +419,9 @@ export class AlexaRemoteExt extends (EventEmitter as new () => EventEmitter) {
 
 	async sendAnnouncement(devices: string[], text: string, locale: string): Promise<unknown> {
 		this.assertInit();
+		if (devices.length === 0) {
+			throw new Error('At least one Alexa device is required to send an announcement.');
+		}
 
 		const targetDevices = devices.map((serial) => {
 			const dev = this.alexa.find(serial);
@@ -650,12 +709,12 @@ export class AlexaRemoteExt extends (EventEmitter as new () => EventEmitter) {
 		});
 	}
 
-	async getPlayerQueue(device: string, size = 50): Promise<unknown> {
+	async getPlayerQueue(device: string, size = 50): Promise<AlexaPlayerQueue> {
 		this.assertInit();
 		return new Promise((resolve, reject) => {
 			this.alexa.getPlayerQueue(device, size, (error: Error | null, result) => {
 				if (error) reject(error);
-				else resolve(result);
+				else resolve((result ?? {}) as AlexaPlayerQueue);
 			});
 		});
 	}
@@ -715,6 +774,7 @@ export class AlexaRemoteExt extends (EventEmitter as new () => EventEmitter) {
 		try {
 			this.alexa.stop?.();
 		} catch { /* noop */ }
+		this.initialized = false;
 		this.removeAllListeners();
 	}
 }

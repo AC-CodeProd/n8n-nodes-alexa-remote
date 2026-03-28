@@ -5,7 +5,7 @@ import type {
   ITriggerFunctions,
   ITriggerResponse,
 } from 'n8n-workflow';
-import { NodeConnectionTypes } from 'n8n-workflow';
+import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 
 import { createAlexaFromCredentials } from './lib/alexa-remote-ext';
 import type { AlexaPushEventType } from './lib/types';
@@ -98,18 +98,30 @@ export class AlexaRemoteTrigger implements INodeType {
   async trigger(this: ITriggerFunctions): Promise<ITriggerResponse | undefined> {
     const credentials = await this.getCredentials('alexaRemoteApi');
     const event = this.getNodeParameter('event') as AlexaPushEventType;
+    let alexa;
 
-    const alexa = await createAlexaFromCredentials(
-      credentials as Record<string, unknown>,
-      true,
-    );
+    try {
+      alexa = await createAlexaFromCredentials(
+        credentials as Record<string, unknown>,
+        true,
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new NodeOperationError(this.getNode(), `Alexa trigger initialization failed: ${message}`, {
+        description:
+          'Ensure your cookie file is valid and that Alexa push connection is available for this account.',
+      });
+    }
 
     try {
       const handler = (payload: unknown): void => {
+        const data = (payload ?? {}) as Record<string, unknown>;
+        const actualEvent = typeof data.eventType === 'string' ? data.eventType : event;
         const item: INodeExecutionData = {
           json: {
-            event,
-            payload: (payload ?? {}) as Record<string, unknown>,
+            event: actualEvent,
+            selectedEvent: event,
+            payload: data,
             timestamp: new Date().toISOString(),
           },
         };

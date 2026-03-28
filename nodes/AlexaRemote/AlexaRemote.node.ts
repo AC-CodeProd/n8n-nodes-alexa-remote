@@ -20,9 +20,49 @@ import properties, { account, auth, bluetooth, conversation, device, interaction
 const CACHE_TTL = 5 * 60 * 1000;
 type CacheEntry<T> = { data: T; ts: number };
 const deviceOptionsCache = new Map<string, CacheEntry<INodePropertyOptions[]>>();
+const deviceOnlyOptionsCache = new Map<string, CacheEntry<INodePropertyOptions[]>>();
 const routineOptionsCache = new Map<string, CacheEntry<INodePropertyOptions[]>>();
 function getCacheKey(credentials: Record<string, unknown>): string {
   return `${credentials.alexaServiceHost as string}|${credentials.amazonPage as string}|${(credentials.cookieFile as string) ?? ''}`;
+}
+
+function buildLoadOptionsErrorOption(error: unknown): INodePropertyOptions[] {
+  const message = error instanceof Error ? error.message : String(error);
+  return [{ name: `Unavailable: ${message}`, value: '' }];
+}
+
+async function getEchoDeviceOptions(
+  credentials: Record<string, unknown>,
+  includeGroups: boolean,
+): Promise<INodePropertyOptions[]> {
+  const key = getCacheKey(credentials);
+  const cache = includeGroups ? deviceOptionsCache : deviceOnlyOptionsCache;
+  const cached = cache.get(key);
+  if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.data;
+
+  const alexa = await createAlexaFromCredentials(credentials);
+  try {
+    const devices = await alexa.getDevices();
+    const deviceOptions: INodePropertyOptions[] = devices.map((d) => ({
+      name: `${d.accountName} (${d.deviceFamily})`,
+      value: d.serialNumber,
+    }));
+
+    let data = deviceOptions;
+    if (includeGroups) {
+      const groups = await alexa.getMultiRoomGroups().catch(() => []);
+      const groupOptions: INodePropertyOptions[] = groups.map((g) => ({
+        name: `[Group] ${g.name}`,
+        value: g.id,
+      }));
+      data = [...deviceOptions, ...groupOptions];
+    }
+
+    cache.set(key, { data, ts: Date.now() });
+    return data;
+  } finally {
+    alexa.disconnect();
+  }
 }
 
 export class AlexaRemote implements INodeType {
@@ -55,31 +95,18 @@ export class AlexaRemote implements INodeType {
       async getEchoDevices(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
         try {
           const credentials = await this.getCredentials('alexaRemoteApi');
-          const creds = credentials as Record<string, unknown>;
-          const key = getCacheKey(creds);
-          const cached = deviceOptionsCache.get(key);
-          if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.data;
+          return await getEchoDeviceOptions(credentials as Record<string, unknown>, true);
+        } catch (error) {
+          return buildLoadOptionsErrorOption(error);
+        }
+      },
 
-          const alexa = await createAlexaFromCredentials(creds);
-          const [devices, groups] = await Promise.all([
-            alexa.getDevices(),
-            alexa.getMultiRoomGroups().catch(() => []),
-          ]);
-          alexa.disconnect();
-
-          const deviceOptions: INodePropertyOptions[] = devices.map((d) => ({
-            name: `${d.accountName} (${d.deviceFamily})`,
-            value: d.serialNumber,
-          }));
-          const groupOptions: INodePropertyOptions[] = groups.map((g) => ({
-            name: `[Group] ${g.name}`,
-            value: g.id,
-          }));
-          const data = [...deviceOptions, ...groupOptions];
-          deviceOptionsCache.set(key, { data, ts: Date.now() });
-          return data;
-        } catch {
-          return [{ name: '— Run Auth → Authenticate First —', value: '' }];
+      async getEchoDevicesOnly(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+        try {
+          const credentials = await this.getCredentials('alexaRemoteApi');
+          return await getEchoDeviceOptions(credentials as Record<string, unknown>, false);
+        } catch (error) {
+          return buildLoadOptionsErrorOption(error);
         }
       },
 
@@ -103,8 +130,8 @@ export class AlexaRemote implements INodeType {
             }));
           routineOptionsCache.set(key, { data, ts: Date.now() });
           return data;
-        } catch {
-          return [{ name: '— Run Auth → Authenticate First —', value: '' }];
+        } catch (error) {
+          return buildLoadOptionsErrorOption(error);
         }
       },
 
@@ -127,8 +154,8 @@ export class AlexaRemote implements INodeType {
               };
             })
             .filter((e) => e.value);
-        } catch {
-          return [{ name: '— Run Auth → Authenticate First —', value: '' }];
+        } catch (error) {
+          return buildLoadOptionsErrorOption(error);
         }
       },
 
@@ -147,8 +174,8 @@ export class AlexaRemote implements INodeType {
               description: `Device: ${n.deviceSerialNumber} | Status: ${n.status}`,
             };
           });
-        } catch {
-          return [{ name: '— Run Auth → Authenticate First —', value: '' }];
+        } catch (error) {
+          return buildLoadOptionsErrorOption(error);
         }
       },
 
@@ -162,8 +189,8 @@ export class AlexaRemote implements INodeType {
             name: l.listName || l.name || l.listType || l.listId,
             value: `${l.listId}|${l.version ?? 1}`,
           }));
-        } catch {
-          return [{ name: '— Run Auth → Authenticate First —', value: '' }];
+        } catch (error) {
+          return buildLoadOptionsErrorOption(error);
         }
       },
 
@@ -182,8 +209,8 @@ export class AlexaRemote implements INodeType {
               name: i.value,
               value: `${i.id}|${i.version}`,
             }));
-        } catch {
-          return [{ name: '— Run Auth → Authenticate First —', value: '' }];
+        } catch (error) {
+          return buildLoadOptionsErrorOption(error);
         }
       },
     },
@@ -205,17 +232,23 @@ export class AlexaRemote implements INodeType {
         }
 
         if (existsSync(cookiePath)) {
+          let alexa: AlexaRemoteExt | undefined;
           try {
             JSON.parse(readCookieFile(cookiePath));
+            alexa = await createAlexaFromCredentials(creds, false);
+            await alexa.getAccount();
             return {
               status: 'OK',
-              message: `Cookie file found and valid at: ${cookiePath}`,
+              message: `Alexa authentication is valid and reachable using cookie file: ${cookiePath}`,
             };
-          } catch {
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
             return {
               status: 'Error',
-              message: `Cookie file at "${cookiePath}" is not valid JSON`,
+              message: `Alexa authentication failed: ${message}`,
             };
+          } finally {
+            alexa?.disconnect();
           }
         }
 
