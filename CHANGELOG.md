@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/AC-CodeProd/n8n-nodes-alexa-remote/compare/v0.4.0...v0.5.0) (2026-03-31)
+
+
+### Features
+
+* refactor/format-notification-time → main ([9d4e390](https://github.com/AC-CodeProd/n8n-nodes-alexa-remote/commit/9d4e390264e49879179ba08ab4113bef92d6dfed))
+
 ## [0.4.0](https://github.com/AC-CodeProd/n8n-nodes-alexa-remote/compare/v0.3.0...v0.4.0) (2026-03-31)
 
 
