@@ -197,10 +197,19 @@ export function buildSoundNode(device: string, soundId: string, locale: string):
 	};
 }
 
+const pad = (value: number, size = 2) => value.toString().padStart(size, '0');
+
 export function formatNotificationTime(isoString: string): string {
-	const date = new Date(isoString);
-	if (isNaN(date.getTime())) {
-		throw new Error(`Invalid date format: "${isoString}". Use ISO 8601 (e.g. 2026-03-19T08:00:00.000)`);
-	}
-	return date.toISOString().replace('Z', '');
+  const date = new Date(isoString);
+
+  if (isNaN(date.getTime())) {
+    throw new Error(
+      `Invalid date format: "${isoString}". Expected ISO 8601 (e.g. 2026-03-19T08:00:00.000)`
+    );
+  }
+
+  const datePart = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  const timePart = `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}.${pad(date.getMilliseconds(), 3)}`;
+
+  return `${datePart}T${timePart}`;
 }
