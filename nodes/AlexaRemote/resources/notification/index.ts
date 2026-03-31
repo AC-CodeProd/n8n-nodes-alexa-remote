@@ -25,7 +25,7 @@ export const description: INodeProperties[] = [
       {
         name: 'Create Notification',
         value: 'createNotification',
-        description: 'Create a new notification (alarm, reminder, timer)',
+        description: 'Create a new notification (alarm or reminder)',
         action: 'Create notification',
       },
       {
@@ -41,7 +41,7 @@ export const description: INodeProperties[] = [
     displayName: 'Device Name or ID',
     name: 'device',
     type: 'options',
-    typeOptions: { loadOptionsMethod: 'getEchoDevices' },
+    typeOptions: { loadOptionsMethod: 'getEchoDevicesOnly' },
     default: '',
     required: true,
     displayOptions: {

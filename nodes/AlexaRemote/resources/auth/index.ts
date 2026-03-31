@@ -60,29 +60,50 @@ export async function execute(
 ): Promise<INodeExecutionData[][]> {
   const loginTimeout = (this.getNodeParameter('loginTimeout', 0, 5) as number) * 60 * 1000;
   const cookiePath = credentials.cookieFile as string;
-  const proxyUrl = `http://${credentials.proxyOwnIp as string}:${credentials.proxyPort as number}`;
+  const proxyOwnIp = credentials.proxyOwnIp as string;
+  const proxyPort = credentials.proxyPort as number;
+  const proxyUrl = `http://${proxyOwnIp}:${proxyPort}`;
+
+  if (!proxyOwnIp || !Number.isFinite(proxyPort) || proxyPort <= 0) {
+    throw new NodeOperationError(
+      this.getNode(),
+      'Proxy IP and Proxy Port must be configured in credentials before authentication.',
+    );
+  }
+
+  if (!Number.isFinite(loginTimeout) || loginTimeout <= 0) {
+    throw new NodeOperationError(
+      this.getNode(),
+      'Login Timeout must be greater than 0 minutes.',
+    );
+  }
 
   const authProxy = new AlexaRemoteExt();
   let resolvedProxyUrl = proxyUrl;
 
-  const cookieStr = await authProxy.startProxyAuth(
-    {
-      alexaServiceHost: credentials.alexaServiceHost as string,
-      amazonPage: credentials.amazonPage as string,
-      acceptLanguage: credentials.acceptLanguage as string,
-      proxyOwnIp: credentials.proxyOwnIp as string,
-      proxyPort: credentials.proxyPort as number,
-    },
-    loginTimeout,
-    (url) => {
-      resolvedProxyUrl = url;
-      this.logger.info(`[Alexa Remote] Proxy ready — open your browser: ${url}`);
-    },
-  );
+  let cookieStr: Record<string, unknown>;
+  try {
+    cookieStr = await authProxy.startProxyAuth(
+      {
+        alexaServiceHost: credentials.alexaServiceHost as string,
+        amazonPage: credentials.amazonPage as string,
+        acceptLanguage: credentials.acceptLanguage as string,
+        proxyOwnIp,
+        proxyPort,
+      },
+      loginTimeout,
+      (url) => {
+        resolvedProxyUrl = url;
+        this.logger.info(`[Alexa Remote] Proxy ready — open your browser: ${url}`);
+      },
+    );
+  } finally {
+    authProxy.disconnect();
+  }
 
   if (cookiePath) {
     try {
-      const toWrite = typeof cookieStr === 'string' ? cookieStr : JSON.stringify(cookieStr, null, 2);
+      const toWrite = JSON.stringify(cookieStr, null, 2);
       writeCookieFile(cookiePath, toWrite);
       this.logger.info(`[Alexa Remote] Cookie saved to: ${cookiePath}`);
     } catch (writeError) {
