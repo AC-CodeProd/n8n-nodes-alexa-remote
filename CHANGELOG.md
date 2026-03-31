@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.0](https://github.com/AC-CodeProd/n8n-nodes-alexa-remote/compare/v0.3.0...v0.4.0) (2026-03-31)
+
+
+### Features
+
+* **alexa-remote:** improve reliability, error handling, and group support ([ba47920](https://github.com/AC-CodeProd/n8n-nodes-alexa-remote/commit/ba479201e8c2741e9aceeab6475d19c542a696fc))
+* fix/alexa-remote-runtime-consistency → main ([6543a04](https://github.com/AC-CodeProd/n8n-nodes-alexa-remote/commit/6543a04c762195da68222a73d525001334a765fc))
+
 ## [0.3.0](https://github.com/AC-CodeProd/n8n-nodes-alexa-remote/compare/v0.2.6...v0.3.0) (2026-03-28)
 
 
