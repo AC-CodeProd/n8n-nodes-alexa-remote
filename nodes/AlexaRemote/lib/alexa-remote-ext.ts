@@ -1,6 +1,7 @@
 import AlexaRemote2 from 'alexa-remote2';
 import AlexaCookie2 from 'alexa-cookie2';
 import { EventEmitter } from 'node:events';
+import { statSync } from 'node:fs';
 import { readCookieFile, writeCookieFile } from './cookie-crypto';
 import { buildMusicNode, buildSingleSequence, buildSpeakNode, buildVolumeNode } from './helpers';
 import type {
@@ -73,6 +74,8 @@ interface AlexaInternal {
 export class AlexaRemoteExt extends (EventEmitter as new () => EventEmitter) {
 	private readonly alexa: AlexaInternal;
 	private initialized = false;
+	private _destroyed = false;
+	private _refreshTimer: ReturnType<typeof setTimeout> | undefined;
 
 	constructor() {
 		super();
@@ -770,12 +773,108 @@ export class AlexaRemoteExt extends (EventEmitter as new () => EventEmitter) {
 		return this.off(eventType, handler);
 	}
 
+	startRefreshScheduler(
+		baseOptions: Pick<AlexaInitOptions, 'alexaServiceHost' | 'amazonPage' | 'acceptLanguage'>,
+		intervalMs: number,
+		cookiePath: string,
+		lastRefreshMs?: number,
+	): void {
+		if (intervalMs <= 0 || !cookiePath) return;
+		this._clearRefreshTimer();
+
+		let mtimeMs = lastRefreshMs ?? 0;
+		if (mtimeMs === 0) {
+			try {
+				mtimeMs = statSync(cookiePath).mtimeMs;
+			} catch { /* file not found — refresh immediately */ }
+		}
+
+		const elapsed = Date.now() - mtimeMs;
+		const delay = Math.max(0, intervalMs - elapsed);
+		this._scheduleRefresh(baseOptions, intervalMs, cookiePath, delay);
+	}
+
+	private _scheduleRefresh(
+		baseOptions: Pick<AlexaInitOptions, 'alexaServiceHost' | 'amazonPage' | 'acceptLanguage'>,
+		intervalMs: number,
+		cookiePath: string,
+		delayMs: number,
+	): void {
+		this._refreshTimer = setTimeout(async () => {
+			if (this._destroyed) return;
+			await this._doRefresh(baseOptions, cookiePath);
+			if (!this._destroyed) {
+				this._scheduleRefresh(baseOptions, intervalMs, cookiePath, intervalMs);
+			}
+		}, delayMs);
+	}
+
+	private _clearRefreshTimer(): void {
+		if (this._refreshTimer !== undefined) {
+			clearTimeout(this._refreshTimer);
+			this._refreshTimer = undefined;
+		}
+	}
+
+	private async _doRefresh(
+		baseOptions: Pick<AlexaInitOptions, 'alexaServiceHost' | 'amazonPage' | 'acceptLanguage'>,
+		cookiePath: string,
+	): Promise<void> {
+		try {
+			const raw = readCookieFile(cookiePath);
+			let cookieData: unknown;
+			try { cookieData = JSON.parse(raw); } catch { cookieData = raw; }
+
+			const initOpts: AlexaInitOptions = { ...baseOptions, usePushConnection: false };
+			applyCookieToInitOptions(initOpts, cookieData);
+
+			const tmp = new AlexaRemoteExt();
+			try {
+				await tmp.init(initOpts);
+				const fresh = tmp.getInternalCookieData();
+				if (fresh) {
+					writeCookieFile(cookiePath, JSON.stringify(fresh, null, 2));
+				}
+			} finally {
+				tmp.disconnect();
+			}
+		} catch (err) {
+			this.emit('refresh-error', err instanceof Error ? err : new Error(String(err)));
+		}
+	}
+
 	disconnect(): void {
+		this._destroyed = true;
+		this._clearRefreshTimer();
 		try {
 			this.alexa.stop?.();
 		} catch { /* noop */ }
 		this.initialized = false;
 		this.removeAllListeners();
+	}
+}
+
+function applyCookieToInitOptions(initOpts: AlexaInitOptions, cookieData: unknown): void {
+	if (typeof cookieData === 'string') {
+		initOpts.cookie = cookieData;
+		return;
+	}
+	const data = cookieData as Record<string, unknown>;
+
+	if (typeof data.localCookie === 'string') {
+		initOpts.cookie = data;
+		return;
+	}
+	if (typeof data.cookie === 'string') {
+		initOpts.cookie = data.cookie;
+	}
+	if (data.formerRegistrationData && typeof data.formerRegistrationData === 'object') {
+		const frd = data.formerRegistrationData as Record<string, unknown>;
+		if (typeof frd.localCookie === 'string') {
+			initOpts.cookie = frd;
+		} else {
+			initOpts.formerRegistrationData = frd;
+		}
 	}
 }
 
@@ -792,8 +891,6 @@ export async function createAlexaFromCredentials(
 		amazonPage: credentials.amazonPage as string,
 		acceptLanguage: credentials.acceptLanguage as string,
 		usePushConnection,
-
-		cookieRefreshInterval: cookieRefreshIntervalMs,
 	};
 	const cookiePath = credentials.cookieFile as string;
 	const raw = readCookieFile(cookiePath);
@@ -803,14 +900,22 @@ export async function createAlexaFromCredentials(
 	} catch {
 		cookieData = raw;
 	}
-	initOptions.cookie = typeof cookieData === 'string' ? cookieData : ((cookieData as Record<string, unknown>)?.cookie ?? cookieData) as string | Record<string, unknown>;
+	applyCookieToInitOptions(initOptions, cookieData);
+
+	let cookieFileMtimeMs = 0;
+	try { cookieFileMtimeMs = statSync(cookiePath).mtimeMs; } catch { /* noop */ }
+
 	await alexa.init(initOptions);
 
 	if (cookiePath) {
 		const freshData = alexa.getInternalCookieData();
 		if (freshData) {
 			try {
-				writeCookieFile(cookiePath, JSON.stringify(freshData, null, 2));
+				const freshJson = JSON.stringify(freshData, null, 2);
+				if (freshJson !== raw) {
+					writeCookieFile(cookiePath, freshJson);
+					cookieFileMtimeMs = Date.now();
+				}
 			} catch { /* noop */ }
 		}
 
@@ -819,10 +924,26 @@ export async function createAlexaFromCredentials(
 			const updatedData = alexa.getInternalCookieData();
 			if (updatedData) {
 				try {
-					writeCookieFile(savedCookiePath, JSON.stringify(updatedData, null, 2));
+					const updatedJson = JSON.stringify(updatedData, null, 2);
+          if (updatedJson !== raw) {
+						writeCookieFile(savedCookiePath, updatedJson);
+					}
 				} catch { /* noop */ }
 			}
 		});
+
+		if (usePushConnection && cookieRefreshIntervalMs > 0) {
+			alexa.startRefreshScheduler(
+				{
+					alexaServiceHost: initOptions.alexaServiceHost,
+					amazonPage: initOptions.amazonPage,
+					acceptLanguage: initOptions.acceptLanguage,
+				},
+				cookieRefreshIntervalMs,
+				cookiePath,
+				cookieFileMtimeMs,
+			);
+		}
 	}
 	return alexa;
 }
