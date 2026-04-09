@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import type { IExecuteFunctions, INodeExecutionData, INodeProperties } from 'n8n-workflow';
 import { NodeOperationError } from 'n8n-workflow';
+import { createAlexaFromCredentials } from '../../lib/alexa-remote-ext';
 import { AlexaRemoteExt } from '../../lib/alexa-remote-ext';
 import { writeCookieFile } from '../../lib/cookie-crypto';
 
@@ -22,6 +23,12 @@ export const description: INodeProperties[] = [
         description:
           'Start the proxy and wait for Amazon login. Once executed, open the proxy URL (http://[Proxy Own IP]:[Proxy Port]/ from your credentials) in your browser to complete the Amazon login.',
         action: 'Authenticate via proxy',
+      },
+      {
+        name: 'Refresh Cookie',
+        value: 'refreshCookie',
+        description: 'Force a token refresh and save the updated cookie to disk. Use with a Schedule Trigger to keep your session alive.',
+        action: 'Refresh cookie',
       },
     ],
     default: 'authenticate',
@@ -58,6 +65,23 @@ export async function execute(
   this: IExecuteFunctions,
   credentials: Record<string, unknown>,
 ): Promise<INodeExecutionData[][]> {
+  const operation = this.getNodeParameter('operation', 0) as string;
+
+  if (operation === 'refreshCookie') {
+    const cookiePath = credentials.cookieFile as string;
+    let alexa: InstanceType<typeof AlexaRemoteExt> | undefined;
+    try {
+      alexa = await createAlexaFromCredentials(credentials);
+      const fresh = alexa.getInternalCookieData();
+      if (fresh && cookiePath) {
+        writeCookieFile(cookiePath, JSON.stringify(fresh, null, 2));
+      }
+    } finally {
+      alexa?.disconnect();
+    }
+    return [[{ json: { success: true, message: 'Cookie refreshed successfully.', cookieFile: cookiePath } }]];
+  }
+
   const loginTimeout = (this.getNodeParameter('loginTimeout', 0, 5) as number) * 60 * 1000;
   const cookiePath = credentials.cookieFile as string;
   const proxyOwnIp = credentials.proxyOwnIp as string;

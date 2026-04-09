@@ -150,6 +150,7 @@ export interface AlexaInitOptions {
 	setupProxy?: boolean;
 
 	cookie?: string | Record<string, unknown>;
+	formerRegistrationData?: Record<string, unknown>;
 }
 
 export type AlexaPushEventType =
