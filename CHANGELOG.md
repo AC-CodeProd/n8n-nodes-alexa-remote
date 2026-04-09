@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/AC-CodeProd/n8n-nodes-alexa-remote/compare/v0.5.0...v0.5.1) (2026-04-09)
+
+
+### Bug Fixes
+
+* replace alexa-remote2 cookie timer with mtime-aware scheduler ([7a1e8ba](https://github.com/AC-CodeProd/n8n-nodes-alexa-remote/commit/7a1e8bab146f9da8f5d412bf991dcef1e10749e0))
+
 ## [0.5.0](https://github.com/AC-CodeProd/n8n-nodes-alexa-remote/compare/v0.4.0...v0.5.0) (2026-03-31)
 
 
