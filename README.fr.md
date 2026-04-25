@@ -56,6 +56,7 @@ Un nœud déclencheur qui écoute les événements push WebSocket Alexa en temps
 
 ### Auth (Authentification)
 - **Authenticate** — Démarrer le proxy et attendre la connexion Amazon. Ouvrez votre navigateur sur `http://[IP Proxy]:[Port Proxy]` lorsque le workflow est en cours d'exécution. Le paramètre **Login Timeout (Minutes)** contrôle le délai d'attente (défaut : 5 min).
+- **Refresh Cookie** — Forcer un renouvellement du token et sauvegarder le cookie mis à jour sur le disque. À utiliser avec un Schedule Trigger pour maintenir la session active.
 
 ### Bluetooth ⚠️ Non testé
 

@@ -56,6 +56,7 @@ A trigger node that listens for real-time Alexa WebSocket push events and starts
 
 ### Auth
 - **Authenticate** — Start the proxy and wait for Amazon login. Open your browser at `http://[Proxy IP]:[Proxy Port]` when the workflow is running. A **Login Timeout (Minutes)** parameter controls how long to wait (default: 5 min).
+- **Refresh Cookie** — Force a token refresh and save the updated cookie to disk. Use with a Schedule Trigger to keep your session alive.
 
 ### Bluetooth ⚠️ Untested
 
