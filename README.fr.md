@@ -152,8 +152,6 @@ Pour utiliser ce nœud, vous devez configurer des identifiants **Alexa Remote AP
 5. Ouvrez l'URL dans votre navigateur et connectez-vous avec votre compte Amazon
 6. Une fois connecté, le cookie est sauvegardé et les identifiants sont prêts
 
-Le cookie sera automatiquement renouvelé selon le paramètre **Refresh Interval**.
-
 ### Tous les champs des identifiants
 
 | Champ | Description | Défaut |
@@ -164,7 +162,6 @@ Le cookie sera automatiquement renouvelé selon le paramètre **Refresh Interval
 | **Amazon Service Host** | Endpoint du service Alexa pour votre région | `pitangui.amazon.com` |
 | **Amazon Page** | Domaine Amazon pour votre région | `amazon.com` |
 | **Language** | Valeur du header Accept-Language | `en-US` |
-| **Refresh Interval (Days)** | Intervalle de renouvellement automatique du cookie | `3` |
 
 ### Régions supportées
 

@@ -152,8 +152,6 @@ To use this node, you need to configure **Alexa Remote API** credentials.
 5. Open the URL in your browser and log in with your Amazon account
 6. Once login is complete, the cookie is saved and credentials are ready
 
-The cookie will be automatically refreshed according to the **Refresh Interval** setting.
-
 ### All Credential Fields
 
 | Field | Description | Default |
@@ -164,7 +162,6 @@ The cookie will be automatically refreshed according to the **Refresh Interval**
 | **Amazon Service Host** | Alexa service endpoint for your region | `pitangui.amazon.com` |
 | **Amazon Page** | Amazon domain for your region | `amazon.com` |
 | **Language** | Accept-Language header value | `en-US` |
-| **Refresh Interval (Days)** | Auto-refresh cookie interval | `3` |
 
 ### Supported Regions
 

@@ -143,7 +143,6 @@ export interface AlexaInitOptions {
 	amazonPage: string;
 	acceptLanguage: string;
   usePushConnection?: boolean;
-	cookieRefreshInterval?: number;
 
 	proxyOwnIp?: string;
 	proxyPort?: number;

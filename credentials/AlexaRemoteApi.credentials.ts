@@ -156,12 +156,5 @@ export class AlexaRemoteApi implements ICredentialType {
       default: 'en-US',
     },
 
-    {
-      displayName: 'Refresh Interval (Days)',
-      name: 'refreshInterval',
-      type: 'number',
-      default: 3,
-      description: 'Auto-refresh cookie interval in days',
-    },
   ];
 }
