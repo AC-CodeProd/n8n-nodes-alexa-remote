@@ -1,8 +1,7 @@
 import { existsSync } from 'node:fs';
 import type { IExecuteFunctions, INodeExecutionData, INodeProperties } from 'n8n-workflow';
 import { NodeOperationError } from 'n8n-workflow';
-import { createAlexaFromCredentials } from '../../lib/alexa-remote-ext';
-import { AlexaRemoteExt } from '../../lib/alexa-remote-ext';
+import { createAlexaFromCredentials, AlexaRemoteExt } from '../../lib/alexa-remote-ext';
 import { writeCookieFile } from '../../lib/cookie-crypto';
 
 export const description: INodeProperties[] = [
