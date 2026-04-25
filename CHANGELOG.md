@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/AC-CodeProd/n8n-nodes-alexa-remote/compare/v0.5.1...v0.6.0) (2026-04-25)
+
+
+### Features
+
+* remove cookie auto-refresh feature ([a5d95d6](https://github.com/AC-CodeProd/n8n-nodes-alexa-remote/commit/a5d95d6435385e7a7706d1142795557c402a1433))
+
 ## [0.5.1](https://github.com/AC-CodeProd/n8n-nodes-alexa-remote/compare/v0.5.0...v0.5.1) (2026-04-09)
 
 
