@@ -55,12 +55,14 @@ export function writeCookieFile(filePath: string, content: string): void {
 	} catch (err) {
 		const code = (err as NodeJS.ErrnoException).code;
 		if (code === 'EACCES' || code === 'EPERM') {
+			// eslint-disable-next-line @n8n/community-nodes/require-node-api-error
 			throw new Error(
 				`Cannot create directory "${dir}": permission denied. ` +
 				`Make sure the n8n process has write access to this path, ` +
 				`or mount a Docker volume at that location (e.g. add "-v /host/path:${dir}" to your docker run command).`,
 			);
 		}
+		// eslint-disable-next-line @n8n/community-nodes/require-node-api-error
 		throw err;
 	}
 	const key = deriveKey();

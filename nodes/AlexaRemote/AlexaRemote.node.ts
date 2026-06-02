@@ -314,7 +314,7 @@ export class AlexaRemote implements INodeType {
         } else if (resource === 'list') {
           responseData = await list.execute.call(this, alexa, operation, itemIndex);
         } else {
-          throw new NodeOperationError(this.getNode(), `Unknown resource: "${resource}"`);
+          throw new NodeOperationError(this.getNode(), `Unknown resource: "${resource}"`, { itemIndex });
         }
 
         if (responseData === null || responseData === undefined) {

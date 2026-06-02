@@ -19,6 +19,7 @@ export class AlexaRemoteTrigger implements INodeType {
     version: 1,
     usableAsTool: true,
     description: 'Starts a workflow when an Alexa WebSocket push event occurs',
+    subtitle: '={{$parameter["event"]}}',
     defaults: {
       name: 'Alexa Remote Trigger',
     },
@@ -151,7 +152,7 @@ export class AlexaRemoteTrigger implements INodeType {
       };
     } catch (error) {
       alexa.disconnect();
-      throw error;
+      throw new NodeOperationError(this.getNode(), error instanceof Error ? error.message : String(error));
     }
   }
 }

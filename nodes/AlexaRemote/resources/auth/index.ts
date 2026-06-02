@@ -76,6 +76,7 @@ export async function execute(
         writeCookieFile(cookiePath, JSON.stringify(fresh, null, 2));
       }
     } catch (err) {
+      // eslint-disable-next-line @n8n/community-nodes/require-node-api-error
       if (err instanceof NodeOperationError) throw err;
       const code = (err as NodeJS.ErrnoException).code;
       const msg = err instanceof Error ? err.message : String(err);
