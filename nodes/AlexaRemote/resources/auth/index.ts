@@ -75,6 +75,18 @@ export async function execute(
       if (fresh && cookiePath) {
         writeCookieFile(cookiePath, JSON.stringify(fresh, null, 2));
       }
+    } catch (err) {
+      if (err instanceof NodeOperationError) throw err;
+      const code = (err as NodeJS.ErrnoException).code;
+      const msg = err instanceof Error ? err.message : String(err);
+      if (['EAI_AGAIN', 'ENOTFOUND', 'ECONNREFUSED', 'ETIMEDOUT', 'ENETUNREACH'].includes(code ?? '')) {
+        throw new NodeOperationError(
+          this.getNode(),
+          `Network error while refreshing cookie: ${msg}`,
+          { description: 'This is a temporary DNS or connectivity issue. Check your internet connection and try again.' },
+        );
+      }
+      throw new NodeOperationError(this.getNode(), `Failed to refresh cookie: ${msg}`);
     } finally {
       alexa?.disconnect();
     }
