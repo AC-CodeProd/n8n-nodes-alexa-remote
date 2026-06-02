@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.1](https://github.com/AC-CodeProd/n8n-nodes-alexa-remote/compare/v0.6.0...v0.6.1) (2026-06-02)
+
+
+### Bug Fixes
+
+* improve error handling and lint config ([cfdd205](https://github.com/AC-CodeProd/n8n-nodes-alexa-remote/commit/cfdd205593a227dc7b4cad3bf353eb9f02b09416))
+* improve error handling in auth cookie refresh ([07ba475](https://github.com/AC-CodeProd/n8n-nodes-alexa-remote/commit/07ba475a75d4bdb6939939dcf57440dbc4b86b48))
+
 ## [0.6.0](https://github.com/AC-CodeProd/n8n-nodes-alexa-remote/compare/v0.5.1...v0.6.0) (2026-04-25)
 
 
