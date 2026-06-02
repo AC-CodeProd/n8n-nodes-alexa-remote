@@ -54,12 +54,12 @@
     "alexa-remote2": "^8.0.4"
   },
   "devDependencies": {
-    "@eslint/js": "^9.29.0",
-    "@n8n/node-cli": "*",
-    "eslint": "^9.29.0",
-    "prettier": "^3.8.1",
-    "release-it": "^19.2.4",
-    "typescript": "^5.9.3"
+    "@eslint/js": "9.29.0",
+    "@n8n/node-cli": "^0.32.1",
+    "eslint": "9.29.0",
+    "prettier": "^3.8.3",
+    "release-it": "^20.2.0",
+    "typescript": "^6.0.3"
   },
   "peerDependencies": {
     "n8n-workflow": "*"
