@@ -15,15 +15,33 @@ import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 
 import { AlexaRemoteExt, createAlexaFromCredentials } from './lib/alexa-remote-ext';
 import { readCookieFile } from './lib/cookie-crypto';
-import properties, { account, auth, bluetooth, conversation, device, interaction, list, notification, routine, smarthome } from './properties';
+import properties, {
+  account,
+  auth,
+  bluetooth,
+  conversation,
+  device,
+  interaction,
+  list,
+  notification,
+  routine,
+  smarthome,
+} from './properties';
 
-const CACHE_TTL = 5 * 60 * 1000;
-type CacheEntry<T> = { data: T; ts: number };
-const deviceOptionsCache = new Map<string, CacheEntry<INodePropertyOptions[]>>();
-const deviceOnlyOptionsCache = new Map<string, CacheEntry<INodePropertyOptions[]>>();
-const routineOptionsCache = new Map<string, CacheEntry<INodePropertyOptions[]>>();
-function getCacheKey(credentials: Record<string, unknown>): string {
-  return `${credentials.alexaServiceHost as string}|${credentials.amazonPage as string}|${(credentials.cookieFile as string) ?? ''}`;
+const STABLE_CACHE_TTL = 5 * 60 * 1000;
+const VOLATILE_CACHE_TTL = 30 * 1000;
+
+type CacheEntry = {
+  data: INodePropertyOptions[];
+  ts: number;
+  ttl: number;
+};
+
+const optionsCache = new Map<string, CacheEntry>();
+
+function getCacheKey(kind: string, credentials: Record<string, unknown>, extra = ''): string {
+  return `${kind}|${credentials.alexaServiceHost as string}|${credentials.amazonPage as string}|${(credentials.cookieFile as string) ?? ''
+    }|${extra}`;
 }
 
 function buildLoadOptionsErrorOption(error: unknown): INodePropertyOptions[] {
@@ -31,45 +49,71 @@ function buildLoadOptionsErrorOption(error: unknown): INodePropertyOptions[] {
   return [{ name: `Unavailable: ${message}`, value: '' }];
 }
 
-async function getEchoDeviceOptions(
+async function getCachedOptions(
+  kind: string,
   credentials: Record<string, unknown>,
-  includeGroups: boolean,
+  ttl: number,
+  loader: (alexa: AlexaRemoteExt) => Promise<INodePropertyOptions[]>,
+  extra = '',
 ): Promise<INodePropertyOptions[]> {
-  const key = getCacheKey(credentials);
-  const cache = includeGroups ? deviceOptionsCache : deviceOnlyOptionsCache;
-  const cached = cache.get(key);
-  if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.data;
+  const now = Date.now();
+
+  for (const [key, entry] of optionsCache) {
+    if (now - entry.ts >= entry.ttl) {
+      optionsCache.delete(key);
+    }
+  }
+
+  const key = getCacheKey(kind, credentials, extra);
+  const cached = optionsCache.get(key);
+  if (cached && now - cached.ts < cached.ttl) {
+    return cached.data;
+  }
 
   const alexa = await createAlexaFromCredentials(credentials);
   try {
-    const devices = await alexa.getDevices();
-    const deviceOptions: INodePropertyOptions[] = devices.map((d) => ({
-      name: `${d.accountName} (${d.deviceFamily})`,
-      value: d.serialNumber,
-    }));
-
-    let data = deviceOptions;
-    if (includeGroups) {
-      const groups = await alexa.getMultiRoomGroups().catch(() => []);
-      const groupOptions: INodePropertyOptions[] = groups.map((g) => ({
-        name: `[Group] ${g.name}`,
-        value: g.id,
-      }));
-      data = [...deviceOptions, ...groupOptions];
-    }
-
-    cache.set(key, { data, ts: Date.now() });
+    const data = await loader(alexa);
+    optionsCache.set(key, { data, ts: now, ttl });
     return data;
   } finally {
     alexa.disconnect();
   }
 }
 
+async function getEchoDeviceOptions(
+  credentials: Record<string, unknown>,
+  includeGroups: boolean,
+): Promise<INodePropertyOptions[]> {
+  const kind = includeGroups ? 'devices+groups' : 'devices';
+
+  return getCachedOptions(kind, credentials, STABLE_CACHE_TTL, async (alexa) => {
+    const devices = await alexa.getDevices();
+
+    const deviceOptions: INodePropertyOptions[] = devices.map((d) => ({
+      name: `${d.accountName} (${d.deviceFamily})`,
+      value: d.serialNumber,
+    }));
+
+    if (!includeGroups) {
+      return deviceOptions;
+    }
+
+    const groups = await alexa.getMultiRoomGroups().catch(() => []);
+
+    const groupOptions: INodePropertyOptions[] = groups.map((g) => ({
+      name: `[Group] ${g.name}`,
+      value: g.id,
+    }));
+
+    return [...deviceOptions, ...groupOptions];
+  });
+}
+
 export class AlexaRemote implements INodeType {
   description: INodeTypeDescription = {
     displayName: 'Alexa Remote',
     name: 'alexaRemote',
-    icon: 'file:alexa.svg',
+    icon: { light: 'file:alexa.svg', dark: 'file:alexa.dark.svg' },
     group: ['transform'],
     version: 1,
     usableAsTool: true,
@@ -87,7 +131,7 @@ export class AlexaRemote implements INodeType {
         testedBy: 'alexaRemoteApiTest',
       },
     ],
-    properties: properties,
+    properties,
   };
 
   methods = {
@@ -113,23 +157,22 @@ export class AlexaRemote implements INodeType {
       async getRoutinesList(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
         try {
           const credentials = await this.getCredentials('alexaRemoteApi');
-          const creds = credentials as Record<string, unknown>;
-          const key = getCacheKey(creds);
-          const cached = routineOptionsCache.get(key);
-          if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.data;
 
-          const alexa = await createAlexaFromCredentials(creds);
-          const routines = await alexa.getAutomationRoutines();
-          alexa.disconnect();
-          const data = routines
+          return await getCachedOptions(
+            'routines',
+            credentials as Record<string, unknown>,
+            STABLE_CACHE_TTL,
+            async (alexa) => {
+              const routines = await alexa.getAutomationRoutines();
 
-            .filter((r) => r.automationId)
-            .map((r) => ({
-              name: r.name || r.automationId,
-              value: r.automationId,
-            }));
-          routineOptionsCache.set(key, { data, ts: Date.now() });
-          return data;
+              return routines
+                .filter((r) => r.automationId)
+                .map((r) => ({
+                  name: r.name || r.automationId,
+                  value: r.automationId,
+                }));
+            },
+          );
         } catch (error) {
           return buildLoadOptionsErrorOption(error);
         }
@@ -138,22 +181,34 @@ export class AlexaRemote implements INodeType {
       async getSmarthomeEntities(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
         try {
           const credentials = await this.getCredentials('alexaRemoteApi');
-          const alexa = await createAlexaFromCredentials(credentials as Record<string, unknown>);
-          const entities = await alexa.getSmarthomeDevices();
-          alexa.disconnect();
-          return entities
-            .filter((e) => e.friendlyName)
-            .map((e) => {
 
-              const id = (e.legacyAppliance?.applianceId ?? e.applianceId ?? e.endpointId ?? e.id) as string;
-              const desc = e.legacyAppliance?.friendlyDescription ?? e.friendlyDescription ?? '';
-              return {
-                name: e.friendlyName,
-                value: id,
-                description: desc,
-              };
-            })
-            .filter((e) => e.value);
+          return await getCachedOptions(
+            'smarthome',
+            credentials as Record<string, unknown>,
+            STABLE_CACHE_TTL,
+            async (alexa) => {
+              const entities = await alexa.getSmarthomeDevices();
+
+              return entities
+                .filter((e) => e.friendlyName)
+                .map((e) => {
+                  const id = (e.legacyAppliance?.applianceId ??
+                    e.applianceId ??
+                    e.endpointId ??
+                    e.id) as string;
+
+                  const desc =
+                    e.legacyAppliance?.friendlyDescription ?? e.friendlyDescription ?? '';
+
+                  return {
+                    name: e.friendlyName,
+                    value: id,
+                    description: desc,
+                  };
+                })
+                .filter((e) => e.value);
+            },
+          );
         } catch (error) {
           return buildLoadOptionsErrorOption(error);
         }
@@ -162,18 +217,26 @@ export class AlexaRemote implements INodeType {
       async getNotificationsList(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
         try {
           const credentials = await this.getCredentials('alexaRemoteApi');
-          const alexa = await createAlexaFromCredentials(credentials as Record<string, unknown>);
-          const notifications = await alexa.getNotifications();
-          alexa.disconnect();
-          return notifications.map((n) => {
-            const label = n.reminderLabel ?? `[${n.type}]`;
-            const date = n.alarmTime ? new Date(n.alarmTime).toLocaleString() : '?';
-            return {
-              name: `${label} — ${date}`,
-              value: n.id,
-              description: `Device: ${n.deviceSerialNumber} | Status: ${n.status}`,
-            };
-          });
+
+          return await getCachedOptions(
+            'notifications',
+            credentials as Record<string, unknown>,
+            VOLATILE_CACHE_TTL,
+            async (alexa) => {
+              const notifications = await alexa.getNotifications();
+
+              return notifications.map((n) => {
+                const label = n.reminderLabel ?? `[${n.type}]`;
+                const date = n.alarmTime ? new Date(n.alarmTime).toLocaleString() : '?';
+
+                return {
+                  name: `${label} — ${date}`,
+                  value: n.id,
+                  description: `Device: ${n.deviceSerialNumber} | Status: ${n.status}`,
+                };
+              });
+            },
+          );
         } catch (error) {
           return buildLoadOptionsErrorOption(error);
         }
@@ -182,13 +245,26 @@ export class AlexaRemote implements INodeType {
       async getAlexaLists(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
         try {
           const credentials = await this.getCredentials('alexaRemoteApi');
+
           const alexa = await createAlexaFromCredentials(credentials as Record<string, unknown>);
-          const lists = await alexa.getLists();
-          alexa.disconnect();
-          return (lists as Array<{ listName?: string; name?: string; listType?: string; listId: string; version?: number }>).map((l) => ({
-            name: l.listName || l.name || l.listType || l.listId,
-            value: `${l.listId}|${l.version ?? 1}`,
-          }));
+          try {
+            const lists = await alexa.getLists();
+
+            return (
+              lists as Array<{
+                listName?: string;
+                name?: string;
+                listType?: string;
+                listId: string;
+                version?: number;
+              }>
+            ).map((l) => ({
+              name: l.listName || l.name || l.listType || l.listId,
+              value: `${l.listId}|${l.version ?? 1}`,
+            }));
+          } finally {
+            alexa.disconnect();
+          }
         } catch (error) {
           return buildLoadOptionsErrorOption(error);
         }
@@ -197,18 +273,27 @@ export class AlexaRemote implements INodeType {
       async getAlexaListItems(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
         try {
           const listRaw = this.getCurrentNodeParameter('listId') as string;
-          if (!listRaw) return [{ name: '— Select a List First —', value: '' }];
+
+          if (!listRaw) {
+            return [{ name: '— Select a List First —', value: '' }];
+          }
+
           const [listId] = listRaw.split('|');
           const credentials = await this.getCredentials('alexaRemoteApi');
+
           const alexa = await createAlexaFromCredentials(credentials as Record<string, unknown>);
-          const items = await alexa.getListItems(listId);
-          alexa.disconnect();
-          return items
-            .filter((i) => !i.completed)
-            .map((i) => ({
-              name: i.value,
-              value: `${i.id}|${i.version}`,
-            }));
+          try {
+            const items = await alexa.getListItems(listId);
+
+            return items
+              .filter((i) => !i.completed)
+              .map((i) => ({
+                name: i.value,
+                value: `${i.id}|${i.version}`,
+              }));
+          } finally {
+            alexa.disconnect();
+          }
         } catch (error) {
           return buildLoadOptionsErrorOption(error);
         }
@@ -221,7 +306,6 @@ export class AlexaRemote implements INodeType {
         credential: ICredentialsDecrypted,
       ): Promise<INodeCredentialTestResult> {
         const creds = credential.data as Record<string, unknown>;
-
         const cookiePath = creds.cookieFile as string;
 
         if (!cookiePath) {

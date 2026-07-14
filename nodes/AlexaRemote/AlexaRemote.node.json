@@ -1,18 +1,21 @@
 {
-	"node": "@ac-codeprod/n8n-nodes-alexa-remote",
-	"nodeVersion": "1.0",
-	"codexVersion": "1.0",
-	"categories": ["Communication", "Utility"],
-	"resources": {
-		"credentialDocumentation": [
-			{
-				"url": "https://github.com/AC-CodeProd/n8n-nodes-alexa-remote?tab=readme-ov-file#credentials"
-			}
-		],
-		"primaryDocumentation": [
-			{
-				"url": "https://github.com/AC-CodeProd/n8n-nodes-alexa-remote?tab=readme-ov-file"
-			}
-		]
-	}
+  "node": "@ac-codeprod/n8n-nodes-alexa-remote",
+  "nodeVersion": "1.0",
+  "codexVersion": "1.0",
+  "categories": [
+    "Communication",
+    "Utility"
+  ],
+  "resources": {
+    "credentialDocumentation": [
+      {
+        "url": "https://github.com/AC-CodeProd/n8n-nodes-alexa-remote?tab=readme-ov-file#credentials"
+      }
+    ],
+    "primaryDocumentation": [
+      {
+        "url": "https://github.com/AC-CodeProd/n8n-nodes-alexa-remote?tab=readme-ov-file"
+      }
+    ]
+  }
 }

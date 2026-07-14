@@ -17,7 +17,7 @@
   ],
   "author": {
     "name": "Alain CAJUSTE",
-    "email": "alain.cajuste@gmail.com"
+    "email": "cajuste.alain@gmail.com"
   },
   "repository": {
     "type": "git",
@@ -50,15 +50,15 @@
     ]
   },
   "dependencies": {
-    "alexa-cookie2": "^5.0.3",
-    "alexa-remote2": "^8.0.4"
+    "alexa-cookie2": "^5.0.5",
+    "alexa-remote2": "^8.1.0"
   },
   "devDependencies": {
-    "@eslint/js": "9.29.0",
-    "@n8n/node-cli": "^0.32.1",
-    "eslint": "9.29.0",
-    "prettier": "^3.8.3",
-    "release-it": "^20.2.0",
+    "@eslint/js": "^9.29.0",
+    "@n8n/node-cli": "^0.38.8",
+    "eslint": "^9.29.0",
+    "prettier": "^3.9.5",
+    "release-it": "^20.2.1",
     "typescript": "^6.0.3"
   },
   "peerDependencies": {

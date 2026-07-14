@@ -14,7 +14,7 @@ export class AlexaRemoteTrigger implements INodeType {
   description: INodeTypeDescription = {
     displayName: 'Alexa Remote Trigger',
     name: 'alexaRemoteTrigger',
-    icon: 'file:alexa.svg',
+    icon: { light: 'file:alexa.svg', dark: 'file:alexa.dark.svg' },
     group: ['trigger'],
     version: 1,
     usableAsTool: true,
@@ -130,10 +130,6 @@ export class AlexaRemoteTrigger implements INodeType {
       };
 
       alexa.onPushEvent(event, handler);
-
-      alexa.on('refresh-error', (err: Error) => {
-        this.logger.warn(`[Alexa Remote] Cookie refresh failed: ${err.message}`);
-      });
 
       return {
         closeFunction: async () => {

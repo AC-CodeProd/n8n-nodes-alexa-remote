@@ -1,8 +1,23 @@
 import { existsSync } from 'node:fs';
 import type { IExecuteFunctions, INodeExecutionData, INodeProperties } from 'n8n-workflow';
 import { NodeOperationError } from 'n8n-workflow';
-import { createAlexaFromCredentials, AlexaRemoteExt } from '../../lib/alexa-remote-ext';
+import {
+  AlexaRemoteExt,
+  createAlexaFromCredentials,
+  normalizeProxyPort,
+  refreshAlexaCookieFromCredentials,
+  stopLoginProxyServer,
+} from '../../lib/alexa-remote-ext';
 import { writeCookieFile } from '../../lib/cookie-crypto';
+
+function getRefreshErrorDetails(err: unknown): { message: string; code?: string } {
+  const message = err instanceof Error ? err.message : String(err ?? 'Unknown error');
+  const rawCode =
+    err && typeof err === 'object'
+      ? (err as NodeJS.ErrnoException).code
+      : undefined;
+  return { message, code: typeof rawCode === 'string' ? rawCode : undefined };
+}
 
 export const description: INodeProperties[] = [
   {
@@ -68,44 +83,118 @@ export async function execute(
 
   if (operation === 'refreshCookie') {
     const cookiePath = credentials.cookieFile as string;
-    let alexa: InstanceType<typeof AlexaRemoteExt> | undefined;
+    let alexa: AlexaRemoteExt | undefined;
+
     try {
-      alexa = await createAlexaFromCredentials(credentials);
-      const fresh = alexa.getInternalCookieData();
-      if (fresh && cookiePath) {
-        writeCookieFile(cookiePath, JSON.stringify(fresh, null, 2));
+      const refreshedCookie = await refreshAlexaCookieFromCredentials(credentials);
+
+      this.logger.info(
+        `[Alexa Remote] Refresh resolved: loginCookie=${typeof refreshedCookie.loginCookie === 'string'}, localCookie=${typeof refreshedCookie.localCookie === 'string'}, refreshToken=${typeof refreshedCookie.refreshToken === 'string'}, macDms=${Boolean(refreshedCookie.macDms)}, csrf=${typeof refreshedCookie.csrf === 'string'}`,
+      );
+
+      alexa = await createAlexaFromCredentials(credentials, false, refreshedCookie);
+      const devices = await alexa.getDevices();
+
+      if (!Array.isArray(devices)) {
+        throw new Error('Alexa device canary returned an invalid response.');
       }
+
+      this.logger.info(`[Alexa Remote] Refresh validation succeeded: devicesCount=${devices.length}`);
+
+      const dataToPersist = alexa.getInternalCookieData() ?? refreshedCookie;
+      let cookieFormat: string;
+      try {
+        cookieFormat = writeCookieFile(cookiePath, JSON.stringify(dataToPersist, null, 2));
+      } catch (writeError) {
+        const msg = writeError instanceof Error ? writeError.message : String(writeError);
+        throw new NodeOperationError(
+          this.getNode(),
+          `Cookie refreshed and validated, but writing the cookie file failed: ${msg}`,
+        );
+      }
+
+      return [
+        [
+          {
+            json: {
+              success: true,
+              message: 'Cookie refreshed and validated successfully.',
+              cookieFile: cookiePath,
+              cookieFormat,
+              devicesCount: devices.length,
+            },
+          },
+        ],
+      ];
     } catch (err) {
-      // eslint-disable-next-line @n8n/community-nodes/require-node-api-error
-      if (err instanceof NodeOperationError) throw err;
-      const code = (err as NodeJS.ErrnoException).code;
-      const msg = err instanceof Error ? err.message : String(err);
+      if (err instanceof NodeOperationError) {
+        // eslint-disable-next-line @n8n/community-nodes/require-node-api-error
+        throw err;
+      }
+
+      const { message: msg, code } = getRefreshErrorDetails(err);
+
+      this.logger.error(
+        `[Alexa Remote] Refresh cookie failed: ${msg}${code ? ` | code=${code}` : ''}`,
+      );
+
       if (['EAI_AGAIN', 'ENOTFOUND', 'ECONNREFUSED', 'ETIMEDOUT', 'ENETUNREACH'].includes(code ?? '')) {
         throw new NodeOperationError(
           this.getNode(),
           `Network error while refreshing cookie: ${msg}`,
-          { description: 'This is a temporary DNS or connectivity issue. Check your internet connection and try again.' },
+          {
+            description:
+              'This is a temporary DNS or connectivity issue. Check your internet connection and try again.',
+          },
         );
       }
+
+      if (
+        msg.includes('interactive login would be required') ||
+        msg.includes('Proxy Server could not be initialized') ||
+        /please open http:\/\//i.test(msg)
+      ) {
+        stopLoginProxyServer();
+        throw new NodeOperationError(
+          this.getNode(),
+          'Cookie refresh could not be validated without an interactive login. Run Auth → Authenticate again.',
+          {
+            description:
+              'The refreshed cookie was rejected during headless validation (commonly a missing device JWT/macDms or an expired registration), so alexa-remote2 tried to fall back to the interactive login proxy. A full re-authentication is required — the proxy cannot complete an automated refresh.',
+          },
+        );
+      }
+
+      if (msg.includes('No tokens in Register response')) {
+        throw new NodeOperationError(
+          this.getNode(),
+          'Cookie refresh was rejected by Amazon. Run Auth → Authenticate again.',
+          {
+            description:
+              'Amazon did not return the expected registration tokens during refresh.',
+          },
+        );
+      }
+
       throw new NodeOperationError(this.getNode(), `Failed to refresh cookie: ${msg}`);
     } finally {
       alexa?.disconnect();
     }
-    return [[{ json: { success: true, message: 'Cookie refreshed successfully.', cookieFile: cookiePath } }]];
   }
 
   const loginTimeout = (this.getNodeParameter('loginTimeout', 0, 5) as number) * 60 * 1000;
   const cookiePath = credentials.cookieFile as string;
   const proxyOwnIp = credentials.proxyOwnIp as string;
-  const proxyPort = credentials.proxyPort as number;
-  const proxyUrl = `http://${proxyOwnIp}:${proxyPort}`;
+  const proxyPort = normalizeProxyPort(credentials.proxyPort);
 
-  if (!proxyOwnIp || !Number.isFinite(proxyPort) || proxyPort <= 0) {
+  if (!proxyOwnIp || proxyPort === undefined) {
     throw new NodeOperationError(
       this.getNode(),
       'Proxy IP and Proxy Port must be configured in credentials before authentication.',
     );
   }
+
+  const proxyUrl = `http://${proxyOwnIp}:${proxyPort}`;
 
   if (!Number.isFinite(loginTimeout) || loginTimeout <= 0) {
     throw new NodeOperationError(
@@ -137,10 +226,11 @@ export async function execute(
     authProxy.disconnect();
   }
 
+  let cookieFormat = 'missing';
   if (cookiePath) {
     try {
       const toWrite = JSON.stringify(cookieStr, null, 2);
-      writeCookieFile(cookiePath, toWrite);
+      cookieFormat = writeCookieFile(cookiePath, toWrite);
       this.logger.info(`[Alexa Remote] Cookie saved to: ${cookiePath}`);
     } catch (writeError) {
       const msg = writeError instanceof Error ? writeError.message : String(writeError);
@@ -158,6 +248,7 @@ export async function execute(
           success: true,
           message: 'Authentication successful. Cookie saved.',
           cookieFile: credentials.cookieFile as string,
+          cookieFormat,
           proxyUrl: resolvedProxyUrl,
         },
       },

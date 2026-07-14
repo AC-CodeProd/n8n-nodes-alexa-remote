@@ -8,9 +8,7 @@ export class AlexaRemoteApi implements ICredentialType {
 
   displayName = 'Alexa Remote API';
 
-  testedBy = 'alexaRemoteApiTest';
-
-  icon = 'file:alexa.svg' as const;
+  icon = { light: 'file:alexa.svg', dark: 'file:alexa.dark.svg' } as const;
 
   documentationUrl = 'https://github.com/AC-CodeProd/n8n-nodes-alexa-remote';
 
