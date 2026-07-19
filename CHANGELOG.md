@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.2](https://github.com/AC-CodeProd/n8n-nodes-alexa-remote/compare/v0.6.1...v0.6.2) (2026-07-19)
+
+
+### Bug Fixes
+
+* **alexa:** correct cookie handling, auth flow and refresh persistence ([6105719](https://github.com/AC-CodeProd/n8n-nodes-alexa-remote/commit/6105719f500551c7d7df20487f0a1ac40cdc93a5))
+
 ## [0.6.1](https://github.com/AC-CodeProd/n8n-nodes-alexa-remote/compare/v0.6.0...v0.6.1) (2026-06-02)
 
 
